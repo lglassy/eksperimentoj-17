@@ -1,0 +1,63 @@
+syntax for experimental pascal derivative.
+
+compilation-unit = unit | program.
+unit = UNIT name ";" uct-part proc-decl-list? END.
+proc-decl-list = proc-decl (";" proc-decl)*.
+program = PROGRAM name ";" uct-part var-part?  proc-decl-list? BEGIN statement-list END.
+uct-part = use-part? const-part? type-part?.
+use-part = use-clause (";" use-clause)*. 
+use-clause = USE utail.
+utail = name | SPECIFIC name "(" type-name-list ")" AS name.
+const-part = CONST name "=" literal (";" name "=" literal)* .
+type-part = TYPE name "=" type (";" name "=" type)* . 
+var-part = VAR name ":" type (";" name ":" type)* . 
+proc-decl = proc-hdr proc-body.
+proc-hdr = (FUNCTION name "(" parameter-list ")" ":" type ";") |
+	(PROCEDURE name "(" parameter-list ";" ).
+proc-body = const-part? type-part? var-part? BEGIN statement-list END.
+type = simple-type | name | enum | array | record | file | proc-type | pointer-type.
+simple-type = INTEGER | REAL | BYTE | BOOLEAN.
+enum = "(" name-list ")".
+name-list = name ("," name)*.
+array = ARRAY expression-list OF type.
+expression-list = expression ("," expression)*.
+record = RECORD field-list END.
+field-list = field (";" field)*. 
+field = name ":" type.
+map = MAP type TO type.  (constraint: key type must be ordinal or string.)
+file = FILE OF type.
+proc-type = (PROCEDURE parameter-list ";") | (FUNCTION parameter-list ":" type);
+pointer-type = "^" type.
+statement = assignment | if | case | while | for | return | break | continue | skip | append.
+assignment = variable ":=" expression.
+if = IF expression THEN statement-list (ELIF expression THEN statement-list)+ END.
+case = CASE expression OF clause-list END.
+clause-list = clause ("|" clause).
+clause: constant-list ":" statement-list.
+while = WHILE expression DO statement-list END.
+for = FOR variable ":=" expression TO expression (BY expression) DO statement-list END.
+return = RETURN expression.
+break = BREAK.
+continue = CONTINUE.
+skip = SKIP.
+append = APPEND variable "," expression.
+
+expression = simple-expression (relop simple-expression)?.
+simple-expression = sign? term (addop term)*.
+term = factor (mulop factor)*.
+factor = unsigned-integer | bool-const | name ("(" expr_list ")" )? | NOT factor | "^" factor } "(" expr ")" .
+relop = "=" | "<" | ">" | "<=" | ">=" | "<>".
+addop = "+" | "-" | OR.
+mulop = "*" | DIV | MOD | AND.
+variable = name.
+bool-const = TRUE | FALSE.
+unsigned_integer = digit+.
+name = letter (letter | digit)*.
+letter = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | 
+         "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | 
+         "u" | "v" | "w" | "x" | "y" | "z" | "_".
+digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" .
+sign = "+" | "-" . 
+
+[end of file]
+

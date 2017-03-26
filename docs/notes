@@ -1,0 +1,118 @@
+Yevgeniya
+=========
+
+notes for the follow-on to nomad.
+
+Types in the language
+---------------------
+
+basic types. INTEGER, REAL, BYTE, BOOLEAN.
+miscellaneous types:
+	subranges: e.g. 0..255.
+	pointers: e.g. ^T.
+	files: FILE of T.
+arrays: ARRAY N OF T. [1,2,3] literal.
+	STRING is just ARRAY OF BYTE.
+records.  RECORD field (";" field)* END.
+
+A non-var formal parameter of pointer type cannot appear inside 
+its procedure as the target of an assignment, more generally 
+this constraints applies to any non-var formal parameter.
+
+The language does not provide a way to declare a variable in an
+initialized state.  For a variable of 
+every 'value-bearing' type, there is a 
+way to initialize the variable at runtime with a literal: ::
+
+ array:   a := array(1,2,3);   (number of elements must equal size of array)
+ record:  r := rtype(1, 2.0); 
+
+These multi-element literals in assignments are just syntactic sugar for a sequence of assignments
+that perform the equivalent initialization.
+
+The interpreter should detect the following conditions: 
+
+1. the use of an uninitialized variable. (read with no previous write in a single scope.)
+2. dead assignments. (write x followed by write x in a single scope with no intervening read.)
+3. write with no subsequent read for a non-returned local variable or VAR parameter.
+
+consider finding the max value in an array. ::
+
+	max := 0;
+	for i := 0 to len(A)-1 do 
+		if a[i] > max then
+			max = a[i]
+		elif a[i] <= max then
+			skip
+		end
+	end
+
+It appears that for each variable, there is a pattern of write-read in use.  If we represent 
+a write operation as 'w' and a read as 'r', the succession of access for a given variable 
+should match one of the following regular expressions. :: 
+
+ constants and constant parameters:	r+
+ local variables: 			(wr+)+
+ VAR parameter (used in-out):		(r+w)+r*
+ VAR parameter (used in): 		r+
+ VAR parameter (used out): 		w
+ 
+ 
+thoughts about maps
+-------------------
+
+For arrays, for-loops provide a way to iterate over the indexes of the array.
+
+How would one iterate over the keys or values of a map variable? ::
+
+something like a 'generic unit' or a structure in ML.
+
+UNIT map(kt, vt: type);
+	contains
+		map_t - type for a map. 
+		new - procedure to create a map of this type.
+		get - procedure to retrieve value from map, given key.
+		set - procedure to add value to map, given key.
+		key_in - function to query if key is in map.
+		iter_init - initialize an iterator.
+		iter_next - get next value from map.
+END;
+	...
+	USE map(string, integer) INSTANTIATE AS simap;
+	VAR m: simap.map_t; 
+	...
+	simap.set(m, 'a', 1);
+	simap.set(m, 'b', 2);
+	...
+	if 'c' in m then ...
+	elif 'c' not in m then ...
+	end;
+	...
+	p := simap.iter_new(m);
+	while p <> nil do 
+		simap.iter_next(p, m, k, v);
+		...p advanced by iter_next() call...
+		...do something with k and v...
+	end
+	
+strings in yevgeniya
+--------------------
+
+a string is just an array of byte, with a presumed encoding of utf-8.  the set of supported code points
+must at least include ascii + the unicode replacement character, but may include more.
+
+how to iterate over a string, getting the unicode characters.
+
+const MAX_CODE_POINT = 65533;
+type u8char_t = 0..MAX_CODE_POINT;
+var uc: u8char_t; 
+begin
+	s := 'hello, world';
+	i := 0;
+	while i < len(s) do 
+		u8char(uc, s, i);
+		...use char value in u8.bytes...
+	end
+end
+
+[end of file]
