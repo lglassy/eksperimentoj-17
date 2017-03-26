@@ -1,3 +1,6 @@
 # eksperimentoj-17
+
 programaro eksperimentoj
-test update
+
+eksperimenta kodo por pascal-simila lingvo "Yevgeniya"
+
