@@ -1,40 +1,49 @@
 Yevgeniya
 =========
 
-notes for the follow-on to nomad.
+notes for 'yevgeniya', a successor to nomad.
 
 Types in the language
 ---------------------
 
-basic types. INTEGER, REAL, BYTE, BOOLEAN.
-miscellaneous types:
+basic types ::
+
+ INTEGER, REAL, BYTE, BOOLEAN.
+
+miscellaneous types ::
+
 	subranges: e.g. 0..255.
 	pointers: e.g. ^T.
 	files: FILE of T.
-arrays: ARRAY N OF T. [1,2,3] literal.
-	STRING is just ARRAY OF BYTE.
-records.  RECORD field (";" field)* END.
 
-A non-var formal parameter of pointer type cannot appear inside 
-its procedure as the target of an assignment, more generally 
-this constraints applies to any non-var formal parameter.
+compound types (containing multiple values) - arrays and records :: 
+
+	ARRAY N OF T. 
+	STRING is just ARRAY OF BYTE.
+	RECORD field (";" field)* END.
+
+A non-var formal parameter of pointer type cannot appear inside its
+procedure as the target of an assignment, more generally this constraints
+applies to any non-var formal parameter.
 
 The language does not provide a way to declare a variable in an
-initialized state.  For a variable of 
-every 'value-bearing' type, there is a 
-way to initialize the variable at runtime with a literal: ::
+initialized state.  For a compound type, there is a way to initialize
+the variable at runtime with a literal: ::
 
  array:   a := array(1,2,3);   (number of elements must equal size of array)
  record:  r := rtype(1, 2.0); 
 
-These multi-element literals in assignments are just syntactic sugar for a sequence of assignments
-that perform the equivalent initialization.
+These multi-element literals in assignments are just syntactic sugar
+for a sequence of assignments that perform the equivalent initialization.
 
-The interpreter should detect the following conditions: 
+The interpreter should detect the following conditions:
 
-1. the use of an uninitialized variable. (read with no previous write in a single scope.)
-2. dead assignments. (write x followed by write x in a single scope with no intervening read.)
-3. write with no subsequent read for a non-returned local variable or VAR parameter.
+1. the use of an uninitialized variable. (read with no 
+   previous write in a single scope.)
+2. dead assignments. (write x followed by write x in a 
+   single scope with no intervening read.)
+3. write with no subsequent read for a non-returned local 
+   variable or VAR parameter.
 
 consider finding the max value in an array. ::
 
@@ -47,16 +56,16 @@ consider finding the max value in an array. ::
 		end
 	end
 
-It appears that for each variable, there is a pattern of write-read in use.  If we represent 
-a write operation as 'w' and a read as 'r', the succession of access for a given variable 
-should match one of the following regular expressions. :: 
+It appears that for each variable, there is a pattern of write-read
+in use.  If we represent a write operation as 'w' and a read as 'r',
+the succession of access for a given variable should match one of the
+following regular expressions. ::
 
  constants and constant parameters:	r+
  local variables: 			(wr+)+
  VAR parameter (used in-out):		(r+w)+r*
  VAR parameter (used in): 		r+
  VAR parameter (used out): 		w
- 
  
 thoughts about maps
 -------------------
@@ -65,9 +74,7 @@ For arrays, for-loops provide a way to iterate over the indexes of the array.
 
 How would one iterate over the keys or values of a map variable? ::
 
-something like a 'generic unit' or a structure in ML.
-
-UNIT map(kt, vt: type);
+ UNIT map(kt, vt: type);
 	contains
 		map_t - type for a map. 
 		new - procedure to create a map of this type.
@@ -76,7 +83,7 @@ UNIT map(kt, vt: type);
 		key_in - function to query if key is in map.
 		iter_init - initialize an iterator.
 		iter_next - get next value from map.
-END;
+ END;
 	...
 	USE map(string, integer) INSTANTIATE AS simap;
 	VAR m: simap.map_t; 
@@ -98,21 +105,79 @@ END;
 strings in yevgeniya
 --------------------
 
-a string is just an array of byte, with a presumed encoding of utf-8.  the set of supported code points
-must at least include ascii + the unicode replacement character, but may include more.
+a string is just an array of byte, with a presumed encoding of utf-8.
+the set of supported code points must at least include ascii + the
+unicode replacement character, but may include more.
 
-how to iterate over a string, getting the unicode characters.
+how to iterate over a string, getting the unicode characters.::
 
-const MAX_CODE_POINT = 65533;
-type u8char_t = 0..MAX_CODE_POINT;
-var uc: u8char_t; 
-begin
-	s := 'hello, world';
-	i := 0;
-	while i < len(s) do 
-		u8char(uc, s, i);
-		...use char value in u8.bytes...
+	const MAX_CODE_POINT = 65533;
+	type u8char_t = 0..MAX_CODE_POINT;
+	var uc: u8char_t; 
+	begin
+		s := 'hello, world';
+		i := 0;
+		while i < len(s) do 
+			u8char(uc, s, i);
+			...use char value in u8.bytes...
+		end
 	end
-end
+
+simple i/o
+----------
+
+There are a number of statements built-in to the language to enable 
+simple text i/o without the use of imported units. ::
+
+	READ, READLN
+	WRITE, WRITELN
+	ASSIGN, OPEN, CLOSE, SEEK, TELL
+
+abstract units
+--------------
+
+An *abstract unit* is a unit that accepts parameters.  These 
+can be function parameters or type parameters.  An abstract
+unit is instantiated with actual parameters, resulting in a 
+*concrete unit*.   (Normal units are concrete units.)
+
+UNIT sorter(T0: $alpha;
+            LT: FUNCTION(A, B: $alpha):BOOLEAN; 
+            CP: PROCEDURE(VAR A, B: $alpha)
+	   );
+
+	PROCEDURE SORT(VAR A: ARRAY OF $alpha);
+		I, J: INTEGER;
+		TMP: $alpha;
+	BEGIN
+		FOR I := 0 TO LEN(A)-2 DO 
+			FOR J := I+1 TO LEN(A)-1 DO 
+				IF LT(A[I], A[J]) THEN
+					CP(T, A[I]);
+					CP(A[I], A[J]);
+					CP(A[J], T)
+				ELIF NOT LT(A[I], A[J]) THEN
+					SKIP
+				END;
+			END;
+		END;
+	END; (* sort *)
+
+END; (* sorter *)
+
+const-ness and pointers
+-----------------------
+
+A constant pointer argument (one declared with VAR) cannot be modified
+in a procedure call, nor can it be modified in a yet-more-deeply nested 
+procedure call.  But this constraint applies to the pointer variable 
+itself, not to fields of the pointer variable (should the pointer point
+to a record type, say).  So this is not allowed:
+
+	PROCEDURE NEW_NODE(P: ^NODE); BEGIN NEW(P) END;
+
+but the following is allowed:
+
+	PROCEDURE INC(P: ^NODE); BEGIN P^.VALUE := P^.VALUE + 1 END;
 
 [end of file]

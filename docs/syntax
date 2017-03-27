@@ -3,17 +3,17 @@ syntax for experimental pascal derivative.
 compilation-unit = unit | program.
 unit = UNIT name ";" uct-part proc-decl-list? END.
 proc-decl-list = proc-decl (";" proc-decl)*.
-program = PROGRAM name ";" uct-part var-part?  proc-decl-list? BEGIN statement-list END.
+program = PROGRAM name ";" uct-part var-part?  proc-decl-list? compound-statement.
+compound-statment = BEGIN statement-list END.
 uct-part = use-part? const-part? type-part?.
 use-part = use-clause (";" use-clause)*. 
 use-clause = USE utail.
-utail = name | SPECIFIC name "(" type-name-list ")" AS name.
+utail = name | name "(" type-name-list ")" AS name.
 const-part = CONST name "=" literal (";" name "=" literal)* .
 type-part = TYPE name "=" type (";" name "=" type)* . 
 var-part = VAR name ":" type (";" name ":" type)* . 
 proc-decl = proc-hdr proc-body.
-proc-hdr = (FUNCTION name "(" parameter-list ")" ":" type ";") |
-	(PROCEDURE name "(" parameter-list ";" ).
+proc-hdr = (FUNCTION name "(" parameter-list ")" ":" type ";") | (PROCEDURE name "(" parameter-list ";" ).
 proc-body = const-part? type-part? var-part? BEGIN statement-list END.
 type = simple-type | name | enum | array | record | file | proc-type | pointer-type.
 simple-type = INTEGER | REAL | BYTE | BOOLEAN.
@@ -24,7 +24,6 @@ expression-list = expression ("," expression)*.
 record = RECORD field-list END.
 field-list = field (";" field)*. 
 field = name ":" type.
-map = MAP type TO type.  (constraint: key type must be ordinal or string.)
 file = FILE OF type.
 proc-type = (PROCEDURE parameter-list ";") | (FUNCTION parameter-list ":" type);
 pointer-type = "^" type.
@@ -41,7 +40,6 @@ break = BREAK.
 continue = CONTINUE.
 skip = SKIP.
 append = APPEND variable "," expression.
-
 expression = simple-expression (relop simple-expression)?.
 simple-expression = sign? term (addop term)*.
 term = factor (mulop factor)*.
