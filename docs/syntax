@@ -13,10 +13,10 @@ const-part = CONST name "=" literal (";" name "=" literal)* .
 type-part = TYPE name "=" type (";" name "=" type)* . 
 var-part = VAR name ":" type (";" name ":" type)* . 
 proc-decl = proc-hdr proc-body.
-proc-hdr = (FUNCTION name "(" parameter-list ")" ":" type ";") | (PROCEDURE name "(" parameter-list ";" ).
+proc-hdr = PROCEDURE name "(" parameter-list ";" .
 proc-body = const-part? type-part? var-part? BEGIN statement-list END.
 type = simple-type | name | enum | array | record | file | proc-type | pointer-type.
-simple-type = INTEGER | REAL | BYTE | BOOLEAN.
+simple-type = INTEGER | RATIONAL | BYTE | BOOLEAN.
 enum = "(" name-list ")".
 name-list = name ("," name)*.
 array = ARRAY expression-list OF type.
@@ -25,11 +25,13 @@ record = RECORD field-list END.
 field-list = field (";" field)*. 
 field = name ":" type.
 file = FILE OF type.
-proc-type = (PROCEDURE parameter-list ";") | (FUNCTION parameter-list ":" type);
+proc-type = PROCEDURE parameter-list ";".
 pointer-type = "^" type.
-statement = assignment | if | case | while | for | return | break | continue | skip | append.
+statement = assignment | if | case | while | for | return | break | 
+	continue | skip | append.
 assignment = variable ":=" expression.
-if = IF expression THEN statement-list (ELIF expression THEN statement-list)+ END.
+if = IF expression THEN statement-list 
+	(ELIF expression THEN statement-list)+ END.
 case = CASE expression OF clause-list END.
 clause-list = clause ("|" clause).
 clause: constant-list ":" statement-list.

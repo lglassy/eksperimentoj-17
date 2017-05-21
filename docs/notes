@@ -1,14 +1,82 @@
 Yevgeniya
 =========
 
-notes for 'yevgeniya', a successor to nomad.
+This file contains notes for 'yevgeniya', a successor to nomad.
+
+The language is a testbed for various ideas I've had
+over the years.  I would see if it's possible to make a language
+and compiler that do a better job of catching the typical
+kinds of errors I make - and if it's possible, to work out 
+what the trade-offs are.
+
+Some of the errors I'd like the compiler to find include:
+
+1. use of uninitialized variables.
+2. write-write with no intervening read.
+3. write to local var with no subsequent read.
+4. problems with global variables.
+5. problems with aliasing.
+6. problems with dynamic memory allocation
+   (read before alloc, read after alloc but 
+   before init, read after free, double free)
+
+characteristics of the language or its reference implementation.
+
+* like Pascal, the language is imperative.
+* syntax influenced by Pascal and PL/0.
+* separate compilation (PROGRAM and UNIT subprograms).
+* all elements defined in a UNIT are exported.  a client 
+  program or unit imports the contents of UNIT with a USE 
+  statement.  the access to contents of an imported UNIT are 
+  fully qualified, and there is no way to get unqualified 
+  import.
+* there are no comments in the language.  comment-like 
+  features are achieved via a literate programming tool 
+  like cobweb.
+* program files are encoded in UTF8.
+* there should be a standard program formatter (like gofmt).
+* there are no global variables.
+* there are no nested procedure definitions.
+* PROCEDUREs but no FUNCTIONs.  procedures are either proper
+  or value-returning.  although there are no tuple types, a 
+  procedure may return multiple results.
+* procedures may have in-only parameters, and
+  have either var or result parameters but not both.
+* result parameters must be allocated in the caller.
+* parameter passing modes are constant, reference and result.
+* types are basic (BOOLEAN, BYTE, INTEGER, RATIONAL), compound 
+  (ARRAY, RECORD), and other types (FILE, pointers, subranges, 
+  and user-defined types).
+* procedures may be passed as arguments, but not returned as 
+  results.  there is no procedure literal.
+* array references are always bounds-checked.
+* IF-ELIF construct and CASE construct are total - one 
+  branch must succeed.  every run implies evaluation of all 
+  branches.  if there are multiple true branches, a true 
+  branch is chosen with the aid of a simple pseudorandom 
+  number generator.  if there is no true branch, the program 
+  halts with a diagnostic message.
+* in an assignment, the order of evaluation of r.h.s. 
+  expressions cannot change the value produced for the 
+  l.h.s. assignment target.
+* a pointer value that is "before" its initial association 
+  (NEW) or "after" a DISPOSE, is in an uninitialized state.
+* there are no exceptions in the language.  a fatal error 
+  causes the program to halt with appropriate diagnostics.
 
 Types in the language
 ---------------------
 
 basic types ::
 
- INTEGER, REAL, BYTE, BOOLEAN.
+ INTEGER, RATIONAL, BYTE, BOOLEAN.
+
+ An INTEGER is a element of a subrange 
+   MIN_INTEGER .. MAX_INTEGER, 
+ where these are implementation-defined (probably close to -2**31
+ and 2**31).
+
+ a RATIONAL is a ratio expressed by two INTEGER values.
 
 miscellaneous types ::
 
@@ -22,19 +90,21 @@ compound types (containing multiple values) - arrays and records ::
 	STRING is just ARRAY OF BYTE.
 	RECORD field (";" field)* END.
 
-A non-var formal parameter of pointer type cannot appear inside its
-procedure as the target of an assignment, more generally this constraints
-applies to any non-var formal parameter.
+A non-var formal parameter of pointer type cannot appear 
+inside its procedure as the target of an assignment, more 
+generally this constraints applies to any non-var formal 
+parameter.
 
-The language does not provide a way to declare a variable in an
-initialized state.  For a compound type, there is a way to initialize
-the variable at runtime with a literal: ::
+The language does not provide a way to declare a variable 
+in an initialized state.  For a compound type, there is a 
+way to initialize the variable at runtime with a literal: ::
 
  array:   a := array(1,2,3);   (number of elements must equal size of array)
  record:  r := rtype(1, 2.0); 
 
-These multi-element literals in assignments are just syntactic sugar
-for a sequence of assignments that perform the equivalent initialization.
+These multi-element literals in assignments are just 
+syntactic sugar for a sequence of assignments performed
+left to right that perform the equivalent initialization, .
 
 The interpreter should detect the following conditions:
 
@@ -56,9 +126,10 @@ consider finding the max value in an array. ::
 		end
 	end
 
-It appears that for each variable, there is a pattern of write-read
-in use.  If we represent a write operation as 'w' and a read as 'r',
-the succession of access for a given variable should match one of the
+It appears that for each variable, there is a pattern of 
+write-read in use.  If we represent a write operation 
+as 'w' and a read as 'r', the succession of access for 
+a given variable should match one of the
 following regular expressions. ::
 
  constants and constant parameters:	r+
@@ -66,13 +137,17 @@ following regular expressions. ::
  VAR parameter (used in-out):		(r+w)+r*
  VAR parameter (used in): 		r+
  VAR parameter (used out): 		w
- 
+
+ there may be a case where a read-write pattern of (wr)+
+ makes sense.  this would be a variable whose writes and reads
+ strictly alternate.
+
 thoughts about maps
 -------------------
 
-For arrays, for-loops provide a way to iterate over the indexes of the array.
-
-How would one iterate over the keys or values of a map variable? ::
+For arrays, for-loops provide a way to iterate over the 
+indexes of the array.  How would one iterate over the 
+keys or values of a map variable? ::
 
  UNIT map(kt, vt: type);
 	contains
@@ -81,11 +156,11 @@ How would one iterate over the keys or values of a map variable? ::
 		get - procedure to retrieve value from map, given key.
 		set - procedure to add value to map, given key.
 		key_in - function to query if key is in map.
-		iter_init - initialize an iterator.
+		iter_new - initialize an iterator.
 		iter_next - get next value from map.
  END;
 	...
-	USE map(string, integer) INSTANTIATE AS simap;
+	USE map(string, integer) AS simap;
 	VAR m: simap.map_t; 
 	...
 	simap.set(m, 'a', 1);
@@ -97,17 +172,18 @@ How would one iterate over the keys or values of a map variable? ::
 	...
 	p := simap.iter_new(m);
 	while p <> nil do 
-		simap.iter_next(p, m, k, v);
+		simap.iter_next(p, k, v);
 		...p advanced by iter_next() call...
 		...do something with k and v...
 	end
-	
+
 strings in yevgeniya
 --------------------
 
-a string is just an array of byte, with a presumed encoding of utf-8.
-the set of supported code points must at least include ascii + the
-unicode replacement character, but may include more.
+a string is just an array of byte, with a presumed 
+encoding of utf-8.  the set of supported code points 
+must at least include ascii + the unicode replacement 
+character, but may include more.
 
 how to iterate over a string, getting the unicode characters.::
 
@@ -118,16 +194,23 @@ how to iterate over a string, getting the unicode characters.::
 		s := 'hello, world';
 		i := 0;
 		while i < len(s) do 
-			u8char(uc, s, i);
-			...use char value in u8.bytes...
+			uc, i := u8char(s, i);
+			...use char value in uc...
 		end
 	end
+
+The ORD intrinsic takes a utf8 byte array and returns the 
+code point associated with the left-most unicode character 
+in the array.  The CHR intrinsic takes an integer code point 
+and returns a byte array (utf8) of the corresponding
+unicode character.
 
 simple i/o
 ----------
 
-There are a number of statements built-in to the language to enable 
-simple text i/o without the use of imported units. ::
+There are a number of statements built-in to the 
+language to enable simple text i/o without the use 
+of imported units. ::
 
 	READ, READLN
 	WRITE, WRITELN
@@ -141,43 +224,176 @@ can be function parameters or type parameters.  An abstract
 unit is instantiated with actual parameters, resulting in a 
 *concrete unit*.   (Normal units are concrete units.)
 
-UNIT sorter(T0: $alpha;
-            LT: FUNCTION(A, B: $alpha):BOOLEAN; 
-            CP: PROCEDURE(VAR A, B: $alpha)
-	   );
+A units is either concrete or abstract. The former
+is the more common of the two - in some sense the normal
+meaning of 'unit', absent qualification.
 
-	PROCEDURE SORT(VAR A: ARRAY OF $alpha);
-		I, J: INTEGER;
-		TMP: $alpha;
+Another take on abstract units.  Consider how an ML functor 
+works, acting as a function that takes a structure and 
+returns a structure.  Here, we would have a way to 
+take an abstract unit and a signature argument, 
+and produce a concrete unit.
+
+UNIT IORDER;  
+	(* concrete unit for integer comparison *)
+	TYPE ALPHA = INTEGER;
+
+	PROCEDURE LT(A, B: ALPHA) RESULT (RV: BOOLEAN);
+		BEGIN
+			IF A < B THEN
+				RV := TRUE
+			ELIF A >= B THEN
+				RV := FALSE
+			END
+		END;
+
+	PROCEDURE COPY(VAR A: ALPHA; B: ALPHA);
+		BEGIN
+			A := B
+		END
+END;
+
+SIGNATURE ORDER;  (* signature unit *)
+	ALPHA: TYPEVAR;
+	LT   : PROCEDURE(A, B: ALPHA) RESULT (RV: BOOLEAN);
+	COPY : PROCEDURE(VAR A: ALPHA; B: ALPHA);
+END;
+
+ABSTRACT UNIT SORTER(ORDER: SIGNATURE);
+
+	PROCEDURE SORT(VAR A: ARRAY OF ORDER.ALPHA);
+		VAR
+			I, J : INTEGER;
+			TMP  : ORDER.ALPHA;
 	BEGIN
 		FOR I := 0 TO LEN(A)-2 DO 
 			FOR J := I+1 TO LEN(A)-1 DO 
-				IF LT(A[I], A[J]) THEN
-					CP(T, A[I]);
-					CP(A[I], A[J]);
-					CP(A[J], T)
-				ELIF NOT LT(A[I], A[J]) THEN
+				IF ORDER.LT(A[I], A[J]) THEN
+					ORDER.COPY(TMP, A[I]);
+					ORDER.COPY(A[I], A[J]);
+					ORDER.COPY(A[J], TMP)
+				ELIF NOT ORDER.LT(A[I], A[J]) THEN
 					SKIP
-				END;
-			END;
-		END;
-	END; (* sort *)
+				END
+			END
+		END
+	END (* SORT *)
 
-END; (* sorter *)
+END; (* SORTER *)
+
+and the client code that wants to use an integer sorter.
+
+program green;
+	use iorder;
+	use sorter(iorder) as isorter;
+	var 
+		a: array 10 of integer
+begin
+	a := array(3,1,4,1,5,9,2,6,5);
+	isorter.sort(a);
+	write(a)
+end
 
 const-ness and pointers
 -----------------------
 
-A constant pointer argument (one declared with VAR) cannot be modified
-in a procedure call, nor can it be modified in a yet-more-deeply nested 
-procedure call.  But this constraint applies to the pointer variable 
-itself, not to fields of the pointer variable (should the pointer point
-to a record type, say).  So this is not allowed:
+A constant pointer argument (one declared with VAR) cannot 
+be modified in a procedure call, nor can it be modified in 
+a yet-more-deeply nested procedure call.  For pointer 
+arguments, this constraint applies to the pointer itself, 
+not to fields of the pointer variable (should the pointer 
+designate a record type, say).  So this is not allowed:
 
 	PROCEDURE NEW_NODE(P: ^NODE); BEGIN NEW(P) END;
 
 but the following is allowed:
 
 	PROCEDURE INC(P: ^NODE); BEGIN P^.VALUE := P^.VALUE + 1 END;
+
+result parameters
+-----------------
+
+use result parameters (out-only parameters) for functions 
+that return one or more results.
+
+procedure inc(j: integer) result(k: integer);
+begin
+	k := j + 1
+end
+
+procedure divmod(a, b: integer) result(quo, rem: integer); 
+begin
+	quo := a div b; 
+	rem := a mod b
+end
+
+use var parameters for in-out parameters.
+
+procedure halve(a: var array array integer);
+	var i, j: integer;
+begin
+	for i in range(a, 1) do 
+		for j in range(a, 2) do 
+			a[i][j] := a[i][j] div 2
+		end
+	end
+end
+
+consider how to encode preconditions and postconditions.
+
+non-result non-var parameters are constant (in-only) parameters, 
+and may not be changed in the procedure.
+
+for-loops.
+
+normal indexed for loop, iterating over an array.
+	for i := 0 to len(a)-1 do .. end.
+equivalent for loop:
+	for i in range a do .. end.
+range a is an abbreviation for range(a, 1) - 
+which means "range over first dimension".
+range(a,2) ranges over second dimension, etc.  say array a is an 
+array of 10 booleans.
+	VAR A: ARRAY 10 BOOLEAN;
+the range notation means we vary the index over the acceptable
+index values of the array, from smallest to greatest.  thus
+	FOR I IN RANGE A DO .. END
+is equivalent to 
+	FOR I := LBOUND(A, 1) TO UBOUND(A, 1) DO .. END
+
+syntax for R17 Subset 1, based on PL/0.
+
+program = PROGRAM name ";" pblock.
+pblock = c-part? v-part? pdecl-list? BEGIN statement-list END.
+c-part = CONST name "=" literal (";" name "=" literal)*.
+v-part = VAR vdecl (";" vdecl)*. 
+vdecl = name-list ":" type.
+name-list = name ("," name)*. 
+type = INTEGER | BOOLEAN.
+pdecl-list = pdecl (";" pdecl)*.
+pdecl = pheader block.
+pheader = PROCEDURE name "(" parm-list ")" result? ";"
+parm-list = parm (";" parm)*.
+parm = VAR? name-list ":" type.
+result = RESULT "(" vdecl (";" vdecl)* ")". 
+block = c-part? v-part? BEGIN statement-list END.
+
+statement = assign | call | read | write | while | if.
+assign = name-list ":=" expression.
+call = name "(" expression-list ")". 
+expression-list = expression ("," expression)*. 
+read = READ name-list.
+write = WRITE expression-list.
+while = WHILE condition DO statement-list END.
+statement-list = statement (";" statement-list)*. 
+if = IF condition THEN statement-list 
+	(ELIF condition THEN statement-list)+ END.
+
+condition = expression (("="|"<>"|"<"|"<="|">"|">=") expression)? .
+expression = term (("+"|"-"|OR) term)*. 
+term = factor (("*"|DIV|AND) factor)*.
+factor = name | literal | unop factor | "(" expression ")" | call.
+literal = TRUE | FALSE | integer-literal.
+unop = "-" | NOT.
 
 [end of file]
