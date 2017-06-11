@@ -9,9 +9,9 @@ and compiler that do a better job of catching the typical
 kinds of errors I make - and if it's possible, to work out 
 what the trade-offs are.
 
-Some of the errors I'd like the compiler to find include:
+Some of the errors I'd like the compiler to help find include:
 
-1. use of uninitialized variables.
+1. use of uninitialized variables.  (read with no prev write)
 2. write-write with no intervening read.
 3. write to local var with no subsequent read.
 4. problems with global variables.
@@ -40,8 +40,8 @@ characteristics of the language or its reference implementation.
 * PROCEDUREs but no FUNCTIONs.  procedures are either proper
   or value-returning.  although there are no tuple types, a 
   procedure may return multiple results.
-* procedures may have in-only parameters, and
-  have either var or result parameters but not both.
+* procedures may have in-only parameters, and either 
+  var or result parameters but not both.
 * result parameters must be allocated in the caller.
 * parameter passing modes are constant, reference and result.
 * types are basic (BOOLEAN, BYTE, INTEGER, RATIONAL), compound 
@@ -106,7 +106,8 @@ These multi-element literals in assignments are just
 syntactic sugar for a sequence of assignments performed
 left to right that perform the equivalent initialization, .
 
-The interpreter should detect the following conditions:
+The interpreter should collect information to help detect the following 
+conditions:
 
 1. the use of an uninitialized variable. (read with no 
    previous write in a single scope.)
@@ -219,10 +220,18 @@ of imported units. ::
 abstract units
 --------------
 
-An *abstract unit* is a unit that accepts parameters.  These 
-can be function parameters or type parameters.  An abstract
-unit is instantiated with actual parameters, resulting in a 
-*concrete unit*.   (Normal units are concrete units.)
+An *abstract unit* is a unit that accepts parameters.  These
+parameters are signatures.
+An abstract unit is instantiated into a 
+*concrete unit* via a USE..AS statement, like
+
+	USE  ABS_UNIT(SIG) AS CONC_UNIT;
+
+(Normal units are concrete units.)
+
+A *signature* is a special type of "sub unit" that only 
+contains type signatures of named types, constants, record 
+types and procedures.
 
 A units is either concrete or abstract. The former
 is the more common of the two - in some sense the normal
@@ -297,7 +306,7 @@ end
 const-ness and pointers
 -----------------------
 
-A constant pointer argument (one declared with VAR) cannot 
+A constant pointer argument (one declared without VAR) cannot 
 be modified in a procedure call, nor can it be modified in 
 a yet-more-deeply nested procedure call.  For pointer 
 arguments, this constraint applies to the pointer itself, 
@@ -309,6 +318,9 @@ designate a record type, say).  So this is not allowed:
 but the following is allowed:
 
 	PROCEDURE INC(P: ^NODE); BEGIN P^.VALUE := P^.VALUE + 1 END;
+
+(The "once const always const" constraint 
+applies to all constant args in general.)
 
 result parameters
 -----------------
@@ -346,9 +358,9 @@ and may not be changed in the procedure.
 
 for-loops.
 
-normal indexed for loop, iterating over an array.
+normal indexed for..to loop, iterating over an array.
 	for i := 0 to len(a)-1 do .. end.
-equivalent for loop:
+equivalent for..range loop:
 	for i in range a do .. end.
 range a is an abbreviation for range(a, 1) - 
 which means "range over first dimension".
@@ -395,5 +407,117 @@ term = factor (("*"|DIV|AND) factor)*.
 factor = name | literal | unop factor | "(" expression ")" | call.
 literal = TRUE | FALSE | integer-literal.
 unop = "-" | NOT.
+
+
+Nondeterminism and the IF statement
+-----------------------------------
+
+In Yevgenia, the if-statement has several aspects which the Pascal
+programmer will find unconventional.
+
+1. There is no "ELSE" branch.
+2. Every branch condition is tested when executing the if statement.
+2. At least one branch must evaluate to true.  If no branches evaluate
+   to true, the program halts with an error.
+3. If more than one branch is true, a true branch is selected using 
+   a pseudorandom number generator and executed.  The choice of true 
+   branch could be done 
+   a. at compile time, so multiple runs of the program on the same
+      input with the same executable produce the same result, or 
+   b. at execution time, so that even with the same input data and 
+      the same executable, different runs could produce different results.
+4. If the lexical order of if-branches changes the output of the program,
+   the program should be considered defective, even though the compiler 
+   itself doesn't detect or report this.
+
+For the first implementation of the language, option 3a will be done.
+
+The case statement, similarly, lacks an else part, and requires that 
+one of the cases evaluate to true.  The case-statement
+differs from the if-statement in that *exactly* one 
+branch must be true.
+
+Consider the if-statement
+
+	if C1 then S1
+	elif C2 then S2
+	elif C3 then S3 end
+
+Using compile-time (3a) 'test order randomization', this code might be 
+evaluated as if it were written in a different order:
+
+	if C2 then S2
+	elif C1 then S1
+	elif C3 then S3 end
+
+Assuming that the programmer uses regression tests, if a program 
+fails following a recompile, this indicates an order dependency 
+problem in if-logic.
+
+The requirement for multiple tools in normal development
+========================================================
+
+Normal development of a unit requires running multiple tools.
+
+* the interpreter (one or more runs) to collect access data
+  on all constants and variables.
+* the sprinkler (one run) to analyze the body of interpreter
+  runs for for two kinds of problems: 
+  + access problems :
+    - uninitialized variable reads (read before write to a var)
+    - dead writes (two writes to a var with no intervening read)
+    - terminal writes (write to a var with no subsequent read)
+  + coverage problems : the set of interpreter runs should include
+    data showing each line being run at least once. 
+  if problems are found, they will be reported, and if no 
+  problems are found, a "blessing" is issued (sprinkler is 
+  short for "holy water sprinkler")
+* the compiler (one run) takes one or more blessed units 
+  compiles it/them into either a library or an executable
+  program.
+
+The interpreter will have a mode in which the reads and writes
+that happen on each lexical line of code in a file is recorded.
+
+The information recorded needs to be enough to allow line
+coverage to be worked out, and enough to follow a variable
+in its home scope and all its subordinate scopes.  This
+information should include: file md5, unit name, proc name,
+temporal line number, physical line number, local var name,
+true var name (unit/proc/localname), local "const-var-type",
+true "const/var type", read/write marker.
+
+The information the interpreter saves for the code in a
+file is saved in the interpretation (or interpreter) record.
+Probably I would save this information in an SQLite database.
+The sprinkler will look at the interpretation record to look
+for coverage and access problems.
+
+When the sprinkler is given a file to check, it will require
+a full set of interpreter records for that file (with the
+same MD5 as the current file) to successfully bless the file.
+
+I could use an Adler-32 checksum instead of an MD5.  The intent
+of identifying a file by checksum or hash is not to prevent
+mischief, but to make it possible for a programmer to get
+a positive assurance that the access characteristics of the
+file's variables and constants are what the compiler expects.
+Having 100% line coverage is not an end in itself, but just
+a way to get a strong approximation of each variable's full
+access history.
+
+The access history of a single run must conform to the all
+variables "const-var-type".  Further, each single run must
+(minimally) exit without error.  When the sprinkler analyzes
+the collective history of all runs, this analysis must show
+that every read-use and write-use of each variable has been
+recorded in at least one run.
+
+The compiler will only compile blessed files.
+
+If Yevgenia source files are shared, I would expect that the
+shared artifacts would include not just the source files,
+but also any scripts and input data required to reproduce
+blessed units with the sprinker.
 
 [end of file]
