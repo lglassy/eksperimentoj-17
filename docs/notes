@@ -417,20 +417,21 @@ programmer will find unconventional.
 
 1. There is no "ELSE" branch.
 2. Every branch condition is tested when executing the if statement.
-2. At least one branch must evaluate to true.  If no branches evaluate
+3. At least one branch must evaluate to true.  If no branches evaluate
    to true, the program halts with an error.
-3. If more than one branch is true, a true branch is selected using 
+4. If more than one branch is true, a true branch is selected using 
    a pseudorandom number generator and executed.  The choice of true 
    branch could be done 
    a. at compile time, so multiple runs of the program on the same
       input with the same executable produce the same result, or 
    b. at execution time, so that even with the same input data and 
       the same executable, different runs could produce different results.
-4. If the lexical order of if-branches changes the output of the program,
+5. If the lexical order of if-branches changes the output of the program,
    the program should be considered defective, even though the compiler 
    itself doesn't detect or report this.
 
-For the first implementation of the language, option 3a will be done.
+For the first implementation of the language, compile-time
+test order randomization (option 4a) will be done.
 
 The case statement, similarly, lacks an else part, and requires that 
 one of the cases evaluate to true.  The case-statement
@@ -452,7 +453,7 @@ evaluated as if it were written in a different order:
 
 Assuming that the programmer uses regression tests, if a program 
 fails following a recompile, this indicates an order dependency 
-problem in if-logic.
+defect in an IF-statement.
 
 The requirement for multiple tools in normal development
 ========================================================
@@ -519,5 +520,20 @@ If Yevgenia source files are shared, I would expect that the
 shared artifacts would include not just the source files,
 but also any scripts and input data required to reproduce
 blessed units with the sprinker.
+
+Making programming easier
+-------------------------
+
+A number of Yevgeniya's features (like the nondeterministic
+IF statement, the total CASE statement, the whole deal 
+of blessing via the sprinkler) on the face of it make 
+programming harder.
+
+Are there things I could do to make the programming task
+easier?   A small thing would be something like golang's 
+implicit semicolons.  A larger thing would be having the 
+interpreter use ABC2's "epimethean typing" where types 
+acquire partial / complete specification only at the 
+end of an interpreter run.
 
 [end of file]
