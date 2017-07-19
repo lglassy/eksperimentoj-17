@@ -5,22 +5,24 @@ This file contains notes for 'yevgeniya', a successor to nomad.
 
 The language is a testbed for various ideas I've had
 over the years.  I would see if it's possible to make a language
-and compiler that do a better job of catching the typical
-kinds of errors I make - and if it's possible, to work out 
+with an interpreter and compiler that would help catch the errors
+I make - or even eliminate some of them altogether.
+It would be interesting to work out 
 what the trade-offs are.
 
-Some of the errors I'd like the compiler to help find include:
+Some of the ideas I'd like to experiment with include:
 
-1. use of uninitialized variables.  (read with no prev write)
-2. write-write with no intervening read.
-3. write to local var with no subsequent read.
-4. problems with global variables.
-5. problems with aliasing.
+1. use of uninitialized variables (read with no prev write, or uninit read)
+2. dead writes (writes with no intervening reads)
+3. terminal writes (writes to loc var with no subsequent read)
+4. no global variables
+5. partial IF/CASEs (non-exhaustive conditions)
+6. overlapping IF/CASEs.
 6. problems with dynamic memory allocation
    (read before alloc, read after alloc but 
    before init, read after free, double free)
 
-characteristics of the language or its reference implementation.
+characteristics of the language.
 
 * like Pascal, the language is imperative.
 * syntax influenced by Pascal and PL/0.
@@ -32,23 +34,22 @@ characteristics of the language or its reference implementation.
   import.
 * there are no comments in the language.  comment-like 
   features are achieved via a literate programming tool 
-  like cobweb.
+  like cobweb or a notebook environment like jupyter.
 * program files are encoded in UTF8.
 * there should be a standard program formatter (like gofmt).
 * there are no global variables.
 * there are no nested procedure definitions.
-* PROCEDUREs but no FUNCTIONs.  procedures are either proper
-  or value-returning.  although there are no tuple types, a 
-  procedure may return multiple results.
-* procedures may have in-only parameters, and either 
-  var or result parameters but not both.
-* result parameters must be allocated in the caller.
-* parameter passing modes are constant, reference and result.
+* PROCEDUREs and FUNCTIONs.  although there are no tuple types, a 
+  function may return multiple results.
+* procedures have in-only or in-out parameters.  functions have 
+  in-only and out-only parameters.
+* out-only function parameters must be allocated in the caller.
+* parameter passing modes are constant, reference (VAR) and result.
 * types are basic (BOOLEAN, BYTE, INTEGER, RATIONAL), compound 
   (ARRAY, RECORD), and other types (FILE, pointers, subranges, 
   and user-defined types).
-* procedures may be passed as arguments, but not returned as 
-  results.  there is no procedure literal.
+* procedures and functions may be passed as arguments, but not returned as 
+  results.  there are no procedure or function literals.
 * array references are always bounds-checked.
 * IF-ELIF construct and CASE construct are total - one 
   branch must succeed.  every run implies evaluation of all 
@@ -71,12 +72,14 @@ basic types ::
 
  INTEGER, RATIONAL, BYTE, BOOLEAN.
 
- An INTEGER is a element of a subrange 
-   MIN_INTEGER .. MAX_INTEGER, 
- where these are implementation-defined (probably close to -2**31
- and 2**31).
+ An INTEGER is a element of a subrange MIN_INTEGER .. MAX_INTEGER, 
+ where these are implementation-defined (16, 32, or 64 bit).
+ The initial test implementation will use int16 for INTEGER.
 
  a RATIONAL is a ratio expressed by two INTEGER values.
+
+ a BYTE is conceptually subrange with values 0...255, but implemented
+ as a uint8.
 
 miscellaneous types ::
 
@@ -110,11 +113,11 @@ The interpreter should collect information to help detect the following
 conditions:
 
 1. the use of an uninitialized variable. (read with no 
-   previous write in a single scope.)
+   previous write in a single scope.) (uninit read)
 2. dead assignments. (write x followed by write x in a 
-   single scope with no intervening read.)
+   single scope with no intervening read.)  (dead write)
 3. write with no subsequent read for a non-returned local 
-   variable or VAR parameter.
+   variable or VAR parameter. (terminal write).
 
 consider finding the max value in an array. ::
 
@@ -146,37 +149,40 @@ following regular expressions. ::
 thoughts about maps
 -------------------
 
-For arrays, for-loops provide a way to iterate over the 
-indexes of the array.  How would one iterate over the 
-keys or values of a map variable? ::
+Golang uses the name 'maps' to refer to associative arrays.
+It would be convenient to provide a standard associative array 
+in the language.  In Yevgenia, these are called 'tables'.
 
- UNIT map(kt, vt: type);
-	contains
-		map_t - type for a map. 
-		new - procedure to create a map of this type.
-		get - procedure to retrieve value from map, given key.
-		set - procedure to add value to map, given key.
-		key_in - function to query if key is in map.
-		iter_new - initialize an iterator.
-		iter_next - get next value from map.
- END;
-	...
-	USE map(string, integer) AS simap;
-	VAR m: simap.map_t; 
-	...
-	simap.set(m, 'a', 1);
-	simap.set(m, 'b', 2);
-	...
-	if 'c' in m then ...
-	elif 'c' not in m then ...
+A table is a dynamically resizeable associative array.  It is 
+provided by an abstract unit 'table' with some default procedures. ::
+
+	SIGNATURE tablevar; 
+		table_type: typevar;
+		procedure init(var t: table_type);
+		function first_key(t: table_type -> k: key_type); 
+		function next_key(k, t: table_type -> rk: key_type); 
+		function is_last_key(k, t: table_type -> b: boolean); 
+		function get(t: table_type, k: key_type 
+			-> v: value_type, b: boolean);
+		procedure set(t: table_type, k: key_type, v: value_type); 
+	END; 
+
+one would iterate over a table with code like: ::
+
+	var t: si_table;
+	begin ...
+		si_table.init(t, k0);
+		k := k0
+		while not si_table.last(k) do 
+			val, present := si_table.get(k)
+			if present then
+				do stuff with val.
+				k := si_table.next(k)
+			elif not present then 
+				error	
+			end;
+		end;
 	end;
-	...
-	p := simap.iter_new(m);
-	while p <> nil do 
-		simap.iter_next(p, k, v);
-		...p advanced by iter_next() call...
-		...do something with k and v...
-	end
 
 strings in yevgeniya
 --------------------
@@ -220,18 +226,17 @@ of imported units. ::
 abstract units
 --------------
 
-An *abstract unit* is a unit that accepts parameters.  These
-parameters are signatures.
-An abstract unit is instantiated into a 
-*concrete unit* via a USE..AS statement, like
+An *abstract unit* is a unit that accepts parameters.  These 
+parameters are signatures.  An abstract unit is instantiated 
+into a *concrete unit* via a USE..AS statement, e.g. 
 
-	USE  ABS_UNIT(SIG) AS CONC_UNIT;
+	USE ABS_UNIT(SIG) AS CONC_UNIT;
 
 (Normal units are concrete units.)
 
-A *signature* is a special type of "sub unit" that only 
-contains type signatures of named types, constants, record 
-types and procedures.
+A *signature* is a top level construct that records the
+type of a unit.  A signature contains type signatures
+of named types, constants, record types and procedures.
 
 A units is either concrete or abstract. The former
 is the more common of the two - in some sense the normal
@@ -246,8 +251,8 @@ and produce a concrete unit.
 UNIT IORDER;  
 	(* concrete unit for integer comparison *)
 	TYPE ALPHA = INTEGER;
-
-	PROCEDURE LT(A, B: ALPHA) RESULT (RV: BOOLEAN);
+	
+	FUNCTION LT(A, B: ALPHA -> RV: BOOLEAN);
 		BEGIN
 			IF A < B THEN
 				RV := TRUE
@@ -262,26 +267,31 @@ UNIT IORDER;
 		END
 END;
 
-SIGNATURE ORDER;  (* signature unit *)
+-------------------------------------------
+another idea:
+
+SIGNATURE ORDER;
 	ALPHA: TYPEVAR;
-	LT   : PROCEDURE(A, B: ALPHA) RESULT (RV: BOOLEAN);
+	LT   : FUNCTION(A, B: ALPHA -> RV: BOOLEAN);
 	COPY : PROCEDURE(VAR A: ALPHA; B: ALPHA);
-END;
+END
 
-ABSTRACT UNIT SORTER(ORDER: SIGNATURE);
+-------------------------------------------
 
-	PROCEDURE SORT(VAR A: ARRAY OF ORDER.ALPHA);
+UNIT SORTER(ABS_ORD: ORDER);
+
+	PROCEDURE SORT(VAR A: ARRAY OF ABS_ORD.ALPHA);
 		VAR
 			I, J : INTEGER;
-			TMP  : ORDER.ALPHA;
+			TMP  : ABS_ORD.ALPHA;
 	BEGIN
 		FOR I := 0 TO LEN(A)-2 DO 
 			FOR J := I+1 TO LEN(A)-1 DO 
-				IF ORDER.LT(A[I], A[J]) THEN
-					ORDER.COPY(TMP, A[I]);
-					ORDER.COPY(A[I], A[J]);
-					ORDER.COPY(A[J], TMP)
-				ELIF NOT ORDER.LT(A[I], A[J]) THEN
+				IF ABS_ORD.LT(A[I], A[J]) THEN
+					ABS_ORD.COPY(TMP, A[I]);
+					ABS_ORD.COPY(A[I], A[J]);
+					ABS_ORD.COPY(A[J], TMP)
+				ELIF NOT ABS_ORD.LT(A[I], A[J]) THEN
 					SKIP
 				END
 			END
@@ -328,18 +338,18 @@ result parameters
 use result parameters (out-only parameters) for functions 
 that return one or more results.
 
-procedure inc(j: integer) result(k: integer);
+function inc(j: integer -> k: integer);
 begin
 	k := j + 1
 end
 
-procedure divmod(a, b: integer) result(quo, rem: integer); 
+function divmod(a, b: integer -> quo, rem: integer); 
 begin
 	quo := a div b; 
 	rem := a mod b
 end
 
-use var parameters for in-out parameters.
+for procedures, use var parameters for in-out parameters.
 
 procedure halve(a: var array array integer);
 	var i, j: integer;
@@ -351,8 +361,6 @@ begin
 	end
 end
 
-consider how to encode preconditions and postconditions.
-
 non-result non-var parameters are constant (in-only) parameters, 
 and may not be changed in the procedure.
 
@@ -360,18 +368,10 @@ for-loops.
 
 normal indexed for..to loop, iterating over an array.
 	for i := 0 to len(a)-1 do .. end.
-equivalent for..range loop:
-	for i in range a do .. end.
-range a is an abbreviation for range(a, 1) - 
-which means "range over first dimension".
-range(a,2) ranges over second dimension, etc.  say array a is an 
-array of 10 booleans.
-	VAR A: ARRAY 10 BOOLEAN;
-the range notation means we vary the index over the acceptable
-index values of the array, from smallest to greatest.  thus
-	FOR I IN RANGE A DO .. END
-is equivalent to 
+ranging over the first dimension of an array:
 	FOR I := LBOUND(A, 1) TO UBOUND(A, 1) DO .. END
+or just
+	FOR I := LBOUND(A) TO UBOUND(A) DO .. END
 
 syntax for R17 Subset 1, based on PL/0.
 
@@ -420,12 +420,9 @@ programmer will find unconventional.
 3. At least one branch must evaluate to true.  If no branches evaluate
    to true, the program halts with an error.
 4. If more than one branch is true, a true branch is selected using 
-   a pseudorandom number generator and executed.  The choice of true 
-   branch could be done 
-   a. at compile time, so multiple runs of the program on the same
-      input with the same executable produce the same result, or 
-   b. at execution time, so that even with the same input data and 
-      the same executable, different runs could produce different results.
+   some method and executed.  The choice of true branch to run is 
+   made at run-time.  This implies that the program could produce different
+   results on different runs with the same input data.
 5. If the lexical order of if-branches changes the output of the program,
    the program should be considered defective, even though the compiler 
    itself doesn't detect or report this.
@@ -512,7 +509,8 @@ variables "const-var-type".  Further, each single run must
 (minimally) exit without error.  When the sprinkler analyzes
 the collective history of all runs, this analysis must show
 that every read-use and write-use of each variable has been
-recorded in at least one run.
+recorded in at least one run.  (we know we have every var
+examined when we have 100% line coverage.)
 
 The compiler will only compile blessed files.
 
@@ -527,13 +525,66 @@ Making programming easier
 A number of Yevgeniya's features (like the nondeterministic
 IF statement, the total CASE statement, the whole deal 
 of blessing via the sprinkler) on the face of it make 
-programming harder.
+programming harder.  It will be interesting to see if 
+these features are a net plus or minus (and plus or minus
+with respect to what ends).
 
-Are there things I could do to make the programming task
-easier?   A small thing would be something like golang's 
-implicit semicolons.  A larger thing would be having the 
-interpreter use ABC2's "epimethean typing" where types 
-acquire partial / complete specification only at the 
-end of an interpreter run.
+thoughts on nondeterministic if
+-------------------------------
 
+say you start out with code like: ::
+
+	if C1 then S1
+	elif C2 then S2
+	elif C3 then S3 end.
+
+at runtime generate three random numbers (corresponding with 
+branch conditions C1, C2, C3.  Call these three random numbers
+R1, R2, R3.   consider implementing the nondeterministic if with 
+logic like :: 
+
+	xprev = 1	--seed
+	..
+	rand(xprev)
+		a = 209
+		m = 4093
+		xnext = a * xprev mod m 
+		return xnext
+
+	idea 3
+		(best idea so far for runtime test order randomization.)
+		rmax = -1
+		r1 = -1 
+		r2 = -1
+		r3 = -1 
+		if C1 then r1 = rand() ; rmax = max(r1, rmax) end
+		if C2 then r2 = rand() ; rmax = max(r2, rmax) end
+		if C3 then r3 = rand() ; rmax = max(r3, rmax) end
+		if   r1 == rmax then S1
+		elif r2 == rmax then S2
+		elif r3 == rmax then S3
+		else
+			fail, no true branch
+		end
+
+	000000000000000000000000000000
+
+	idea 6, another try at round robin.
+
+		(at start of scope) offset = 0 
+		...
+		b[0] = C0 ; b[1] = C1 ; b[2] = C2 
+		for i 0 to 2 do
+			k = (i+offset) % 3
+			if   k==0 and b0 then S0
+			elif k==1 and b1 then S1
+			elif k==2 and b2 then S2
+			else
+				fail, no true branch
+			end
+		end
+		offset = offset + 1
+
+	000000000000000000000000000000
+ 
 [end of file]
