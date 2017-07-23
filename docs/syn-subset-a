@@ -1,0 +1,51 @@
+Sat Jul 22 22:18:49 EDT 2017
+
+Syntax for Yevgenia Eksperimentoj-17 Subset A (Yev-A).
+With some help from PL/0.
+
+unit = UNIT name ; ubody.
+ubody =  const-part? var-part? pdecl-list? BEGIN statement-list END.
+const-part = CONST (name "=" literal ";")+. 
+var-part = VAR (var-decl ";")+.
+var-decl = name-list ":" type.
+name-list = name ("," name)*. 
+type = INTEGER | BOOLEAN.
+pdecl-list = (pdecl ";")+.
+pdecl = pheader pbody.
+pheader = PROCEDURE name "(" parm-list? ")" ";"
+parm-list = parm (";" parm)*.
+parm = VAR? name-list ":" type.
+pbody = const-part? var-part? BEGIN statement-list END.
+statement-list = (statement ";")+. 
+statement = assign | call | read | write | while | if.
+assign = name ":=" expression.
+call = name "(" expression-list ")". 
+expression-list = expression ("," expression)*. 
+read = READ name-list.
+write = WRITE expression-list.
+while = WHILE condition DO statement-list END.
+if = IF condition THEN statement-list 
+	(ELIF condition THEN statement-list)+ END.
+condition = expression (("="|"<>"|"<"|"<="|">"|">=") expression)? .
+expression = term (("+"|"-"|OR) term)*. 
+term = factor (("*"|DIV|MOD|AND) factor)*.
+factor = name | literal | unop factor | "(" expression ")" | call.
+literal = TRUE | FALSE | integer-literal.
+unop = "-" | NOT.
+
+---start example---
+
+UNIT MAIN;
+	PROCEDURE MAIN();
+		VAR I: INTEGER;
+	BEGIN
+		I := 1;
+		WHILE I < 5 DO 
+			WRITE I, I*I; 
+			I := I + 1; 
+		END;
+	END;
+END
+
+---end of example---
+
