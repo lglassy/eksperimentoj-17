@@ -3,12 +3,11 @@ Yevgeniya
 
 This file contains notes for 'yevgeniya', a successor to nomad.
 
-The language is a testbed for various ideas I've had
-over the years.  I would see if it's possible to make a language
-with an interpreter and compiler that would help catch the errors
-I make - or even eliminate some of them altogether.
-It would be interesting to work out 
-what the trade-offs are.
+The language is a testbed for various ideas I've had over the years.
+I would see if it's possible to make a language with an interpreter and
+compiler that would help catch the errors I make - or even eliminate
+some of them altogether.  It would be interesting to work out what the
+trade-offs are.
 
 Some of the ideas I'd like to experiment with include:
 
@@ -44,8 +43,10 @@ characteristics of the language.
 * procedures have in-only or in-out parameters.  functions have 
   in-only and out-only parameters.
 * out-only function parameters must be allocated in the caller.
+	(think about how this would work.  can I do writeln(sqrt(2.0)) ? 
+	here the caller has to allocate a temporary.)
 * parameter passing modes are constant, reference (VAR) and result.
-* types are basic (BOOLEAN, BYTE, INTEGER, RATIONAL), compound 
+* types are basic (BOOLEAN, BYTE, INTEGER, REAL), compound 
   (ARRAY, RECORD), and other types (FILE, pointers, subranges, 
   and user-defined types).
 * procedures and functions may be passed as arguments, but not returned as 
@@ -70,13 +71,15 @@ Types in the language
 
 basic types ::
 
- INTEGER, RATIONAL, BYTE, BOOLEAN.
+ INTEGER, REAL, BYTE, BOOLEAN.
 
  An INTEGER is a element of a subrange MIN_INTEGER .. MAX_INTEGER, 
  where these are implementation-defined (16, 32, or 64 bit).
  The initial test implementation will use int16 for INTEGER.
 
- a RATIONAL is a ratio expressed by two INTEGER values.
+ a REAL is either a float32 or float64, depending on sizeof INTEGER.
+ for 16-bit and 32-bit ints, REAL is float32, for 64-bit ints real 
+ is float64.
 
  a BYTE is conceptually subrange with values 0...255, but implemented
  as a uint8.
@@ -87,11 +90,25 @@ miscellaneous types ::
 	pointers: e.g. ^T.
 	files: FILE of T.
 
-compound types (containing multiple values) - arrays and records :: 
+compound types (containing multiple values) - arrays, records, tables :: 
 
 	ARRAY N OF T. 
 	STRING is just ARRAY OF BYTE.
 	RECORD field (";" field)* END.
+
+	arrays and records can be assigned to or compared with 
+	conformal display literals:
+
+	type
+		rt = record(x:integer; b:boolean);
+	var 
+		a: array 3 of integer;
+		r: rt;
+	begin
+		a := (1,2,3);
+		r = (12, true);
+	...
+
 
 A non-var formal parameter of pointer type cannot appear 
 inside its procedure as the target of an assignment, more 
@@ -99,11 +116,11 @@ generally this constraints applies to any non-var formal
 parameter.
 
 The language does not provide a way to declare a variable 
-in an initialized state.  For a compound type, there is a 
-way to initialize the variable at runtime with a literal: ::
+in an initialized state.  For all compound type, there is a 
+way to initialize the variable at runtime with a display literal: ::
 
- array:   a := array(1,2,3);   (number of elements must equal size of array)
- record:  r := rtype(1, 2.0); 
+ array:   a := (1,2,3) ;   (number of elements must equal size of array)
+ record:  r := (1, 2.0); 
 
 These multi-element literals in assignments are just 
 syntactic sugar for a sequence of assignments performed
@@ -123,12 +140,9 @@ consider finding the max value in an array. ::
 
 	max := 0;
 	for i := 0 to len(A)-1 do 
-		if a[i] > max then
-			max = a[i]
-		elif a[i] <= max then
-			skip
-		end
-	end
+		alt
+			a[i] > max => max = a[i]
+		|	a[i] <= max => skip; 
 
 It appears that for each variable, there is a pattern of 
 write-read in use.  If we represent a write operation 
@@ -223,19 +237,90 @@ of imported units. ::
 	WRITE, WRITELN
 	ASSIGN, OPEN, CLOSE, SEEK, TELL
 
+the USE statement
+-----------------
+
+examples of the USE statement.
+
+using a concrete system unit.
+
+	USE MATH;
+
+using an abstract system unit.
+
+	USE RAT;	(* a concrete unit *)
+	USE CMPLX_MATH(RAT) AS CMPLX_RAT;
+
+using a local unit (a non-system unit provided either by a third-party
+or by the programmer herself).
+
+	USE "FOO.ORG/IMATH"
+	(* makes IMATH module available. *)
+
+using a local abstract unit.
+
+	USE "FOO.ORG/RAT";	(* we now have concrete RAT module *)
+	USE "FOO.ORG/IMATH" (RAT) AS RAT_MATH; 
+
+All of these USEs are non-versioned.  This means they do not
+have reproducible requirements for the signatures of the USEd units.
+For development or experimental cases, this is ok.  
+
+As an idea to be tested (does versioning units help?) - we can specify
+a version to the sprinkler.   The unit 'version' or meta-signature for a
+unit, is just the hash of the signature of a unit (where this signature
+is written out as a string of text, in a normalized form).  The hash
+can be a non-cryptologic hash or a cryptologic hash like MD5, etc.
+
+	USE MATH, VERSION "adler32:062c0215"; 
+	USE "FOO.ORG/RAT", VERSION "adler32:deadbeef";	
+	USE "FOO.ORG/IMATH", VERSION "crc32:0123abcd" (RAT) AS RAT_MATH; 
+
+idea:
+	use = USE mpath version? utail.
+	utail = "(" modargs ")" AS new_name) | (AS new_name)?.
+another idea:
+	USE ISORTER = SORTER(IMATH);
+another idea - use as an extended construct.
+	USE
+		MATH	(VERSION "xx:yy") 
+		HASHLIB	(VERSION "xx:gg")
+		"FOO.ORG/RAT" (VERSION "xx:uu")	(* gets RAT *)
+		"FOO.ORG/IMG" (VERSION "xx:aa") AS IMAGE;
+	END;
+but we need to make it possible to use abstract units...
+	USE  	
+		C                   : "xx:bb";
+		A                   : "xx:aa" AS B;
+		"FOO.ORG/IMG"       : "xx:aa" AS IMAGE;
+		USE "FOO.ORG/IMATH" : "crc32:0123abcd" (RAT) AS RAT_MATH; 
+	END;
+or in single unit per use form:
+	USE D;
+	USE C: "xx:aa"; 
+	USE A: "xx:aa" AS B; 
+	USE "FOO.ORG/IMG"; 
+	USE "FOO.ORG/FGP" AS F;
+	USE "FOO.ORG/FGP" : "xx:aa" AS F;
+	USE "FOO.ORG/SORTER" : "xx:aa" (ISORT) AS ISORTER;
+
+
+	
 abstract units
 --------------
 
 An *abstract unit* is a unit that accepts parameters.  These 
-parameters are signatures.  An abstract unit is instantiated 
+parameters are other concrete units, each of which has a type
+or 'signature'.  An abstract unit is instantiated 
 into a *concrete unit* via a USE..AS statement, e.g. 
 
 	USE ABS_UNIT(SIG) AS CONC_UNIT;
 
 (Normal units are concrete units.)
 
-A *signature* is a top level construct that records the
-type of a unit.  A signature contains type signatures
+A *signature* is a kind of type - 
+the type of a unit.  A signature type
+contains type signatures
 of named types, constants, record types and procedures.
 
 A units is either concrete or abstract. The former
@@ -249,6 +334,7 @@ take an abstract unit and a signature argument,
 and produce a concrete unit.
 
 UNIT IORDER;  
+
 	(* concrete unit for integer comparison *)
 	TYPE ALPHA = INTEGER;
 	
@@ -258,7 +344,6 @@ UNIT IORDER;
 				RV := TRUE
 			ELIF A >= B THEN
 				RV := FALSE
-			END
 		END;
 
 	PROCEDURE COPY(VAR A: ALPHA; B: ALPHA);
@@ -268,17 +353,17 @@ UNIT IORDER;
 END;
 
 -------------------------------------------
-another idea:
 
-SIGNATURE ORDER;
-	ALPHA: TYPEVAR;
-	LT   : FUNCTION(A, B: ALPHA -> RV: BOOLEAN);
-	COPY : PROCEDURE(VAR A: ALPHA; B: ALPHA);
-END
+TYPE
+	ORDER = SIGNATURE
+			ALPHA: TYPEVAR;
+			LT   : FUNCTION(A, B: ALPHA -> RV: BOOLEAN);
+			COPY : PROCEDURE(VAR A: ALPHA; B: ALPHA)
+		END;
 
 -------------------------------------------
 
-UNIT SORTER(ABS_ORD: ORDER);
+UNIT SORTER(ABS_ORD: ORDER);  (* an abstract unit *)
 
 	PROCEDURE SORT(VAR A: ARRAY OF ABS_ORD.ALPHA);
 		VAR
@@ -288,14 +373,14 @@ UNIT SORTER(ABS_ORD: ORDER);
 		FOR I := 0 TO LEN(A)-2 DO 
 			FOR J := I+1 TO LEN(A)-1 DO 
 				IF ABS_ORD.LT(A[I], A[J]) THEN
+					BEGIN
 					ABS_ORD.COPY(TMP, A[I]);
 					ABS_ORD.COPY(A[I], A[J]);
 					ABS_ORD.COPY(A[J], TMP)
+					END
 				ELIF NOT ABS_ORD.LT(A[I], A[J]) THEN
 					SKIP
-				END
-			END
-		END
+		
 	END (* SORT *)
 
 END; (* SORTER *)
@@ -420,15 +505,16 @@ programmer will find unconventional.
 3. At least one branch must evaluate to true.  If no branches evaluate
    to true, the program halts with an error.
 4. If more than one branch is true, a true branch is selected using 
-   some method and executed.  The choice of true branch to run is 
-   made at run-time.  This implies that the program could produce different
-   results on different runs with the same input data.
+   some method and executed.  The choice of true branch to execute is 
+   implementation-dependent.  A program that relies on a particular order
+   of if-test execution is erroneous; an implementation is encouraged 
+   but not required to diagnose this condition.
 5. If the lexical order of if-branches changes the output of the program,
    the program should be considered defective, even though the compiler 
-   itself doesn't detect or report this.
+   itself is not required to detect or report this.
 
 For the first implementation of the language, compile-time
-test order randomization (option 4a) will be done.
+test order randomization will be done.
 
 The case statement, similarly, lacks an else part, and requires that 
 one of the cases evaluate to true.  The case-statement
