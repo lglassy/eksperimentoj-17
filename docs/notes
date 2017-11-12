@@ -24,6 +24,8 @@ Some of the ideas I'd like to experiment with include:
 characteristics of the language.
 
 * like Pascal, the language is imperative.
+* like Pascal, the language is case-insensitive (except for strings).
+* there should be a simple way to connect to C bindings.
 * syntax influenced by Pascal and PL/0.
 * separate compilation (PROGRAM and UNIT subprograms).
 * all elements defined in a UNIT are exported.  a client 
@@ -81,8 +83,10 @@ basic types ::
  for 16-bit and 32-bit ints, REAL is float32, for 64-bit ints real 
  is float64.
 
- a BYTE is conceptually subrange with values 0...255, but implemented
- as a uint8.
+ a BYTE is conceptually an INTEGER subrange with values 0...255, 
+ but implemented as a uint8.
+
+ a BOOLEAN is implemented as a uint8 with values 0 (false) and 1 (true).
 
 miscellaneous types ::
 
@@ -179,6 +183,7 @@ provided by an abstract unit 'table' with some default procedures. ::
 		function get(t: table_type, k: key_type 
 			-> v: value_type, b: boolean);
 		procedure set(t: table_type, k: key_type, v: value_type); 
+		...there should be an APPEND and a DELETE procedure.
 	END; 
 
 one would iterate over a table with code like: ::
@@ -236,6 +241,29 @@ of imported units. ::
 	READ, READLN
 	WRITE, WRITELN
 	ASSIGN, OPEN, CLOSE, SEEK, TELL
+
+units in general
+----------------
+
+A unit is implemented as a directory of files.  The contents of all 
+the files are considered to be catentated together when the unit is 
+compiled, with the contents being scanned twice (so that the contents
+need not be written in any particular order).  Note that the unit directory
+treats all .yev source files as belonging to the unit;
+do not put
+source files into a unit directory that are not part of the unit. 
+
+A unit contains (in whatever order) - 
+
+* zero or more USE statements.
+* zero or more CONST sections.
+* zero or more TYPE sections.
+* zero or more PROCEDURE or FUNCTION definitions.
+
+A unit will never contain a VAR section or an executable block.  All 
+the entities defined in a unit are considered exported.  A programmer 
+may define a naming convention for entities that should be considered
+private to the unit, vs those that should be considered public.
 
 the USE statement
 -----------------
@@ -303,8 +331,19 @@ or in single unit per use form:
 	USE "FOO.ORG/FGP" AS F;
 	USE "FOO.ORG/FGP" : "xx:aa" AS F;
 	USE "FOO.ORG/SORTER" : "xx:aa" (ISORT) AS ISORTER;
-
-
+another idea.  consider a fortran-like keyword=value syntax.
+	USE (unit=MATH); --system use
+	USE (unit=MATH, localname=M); --system use with rename.
+	USE (MATH, M); --shorter syntax for the previous use.
+	USE (unit="foo.org/img"); --local use
+	USE (unit="foo.org/img", alias=image); --local use with rename.
+	USE (unit=math, alias=m, args=isort); --local use of abstract unit.
+	USE ("math", "m", "isort");
+USE "unit=math", "alias=m";
+USE "math", "m", "version=xx:aa"; 
+USE "sorter", "args=iorder", "as=isorter";
+USE "sorter", "version=xx:aa", "args=iorder", "as=isorter";
+use "xmath", "args=iorder,corder", "as=imath"; 
 	
 abstract units
 --------------
@@ -333,7 +372,9 @@ returns a structure.  Here, we would have a way to
 take an abstract unit and a signature argument, 
 and produce a concrete unit.
 
-UNIT IORDER;  
+--begin file iorder/main.yev
+
+UNIT IORDER;
 
 	(* concrete unit for integer comparison *)
 	TYPE ALPHA = INTEGER;
@@ -352,7 +393,11 @@ UNIT IORDER;
 		END
 END;
 
--------------------------------------------
+--end file iorder/main.yev
+
+--begin file sorter/main.yev
+
+ABSTRACT USE O: ORDER;
 
 TYPE
 	ORDER = SIGNATURE
@@ -361,29 +406,25 @@ TYPE
 			COPY : PROCEDURE(VAR A: ALPHA; B: ALPHA)
 		END;
 
--------------------------------------------
+	
+PROCEDURE SORT(VAR A: ARRAY OF O.ALPHA);
+	VAR
+		I, J : INTEGER;
+		TMP  : O.ALPHA;
+BEGIN
+	FOR I := 0 TO LEN(A)-2 DO 
+		FOR J := I+1 TO LEN(A)-1 DO 
+			IF O.LT(A[I], A[J]) THEN
+				BEGIN
+				O.COPY(TMP, A[I]);
+				O.COPY(A[I], A[J]);
+				O.COPY(A[J], TMP)
+				END
+			ELIF NOT O.LT(A[I], A[J]) THEN
+				SKIP
+END (* SORT *)
 
-UNIT SORTER(ABS_ORD: ORDER);  (* an abstract unit *)
-
-	PROCEDURE SORT(VAR A: ARRAY OF ABS_ORD.ALPHA);
-		VAR
-			I, J : INTEGER;
-			TMP  : ABS_ORD.ALPHA;
-	BEGIN
-		FOR I := 0 TO LEN(A)-2 DO 
-			FOR J := I+1 TO LEN(A)-1 DO 
-				IF ABS_ORD.LT(A[I], A[J]) THEN
-					BEGIN
-					ABS_ORD.COPY(TMP, A[I]);
-					ABS_ORD.COPY(A[I], A[J]);
-					ABS_ORD.COPY(A[J], TMP)
-					END
-				ELIF NOT ABS_ORD.LT(A[I], A[J]) THEN
-					SKIP
-		
-	END (* SORT *)
-
-END; (* SORTER *)
+--end file sorter/main.yev
 
 and the client code that wants to use an integer sorter.
 
