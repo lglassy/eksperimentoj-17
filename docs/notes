@@ -300,50 +300,26 @@ unit, is just the hash of the signature of a unit (where this signature
 is written out as a string of text, in a normalized form).  The hash
 can be a non-cryptologic hash or a cryptologic hash like MD5, etc.
 
-	USE MATH, VERSION "adler32:062c0215"; 
-	USE "FOO.ORG/RAT", VERSION "adler32:deadbeef";	
-	USE "FOO.ORG/IMATH", VERSION "crc32:0123abcd" (RAT) AS RAT_MATH; 
+	USE MATH            VERSION "adler32:062c0215"; 
+	USE "FOO.ORG/RAT"   VERSION "adler32:deadbeef";	
+	USE "FOO.ORG/IMATH" VERSION "crc32:0123abcd" WITH (RAT) AS RAT_MATH; 
 
-idea:
-	use = USE mpath version? utail.
-	utail = "(" modargs ")" AS new_name) | (AS new_name)?.
-another idea:
-	USE ISORTER = SORTER(IMATH);
-another idea - use as an extended construct.
-	USE
-		MATH	(VERSION "xx:yy") 
-		HASHLIB	(VERSION "xx:gg")
-		"FOO.ORG/RAT" (VERSION "xx:uu")	(* gets RAT *)
-		"FOO.ORG/IMG" (VERSION "xx:aa") AS IMAGE;
-	END;
-but we need to make it possible to use abstract units...
-	USE  	
-		C                   : "xx:bb";
-		A                   : "xx:aa" AS B;
-		"FOO.ORG/IMG"       : "xx:aa" AS IMAGE;
-		USE "FOO.ORG/IMATH" : "crc32:0123abcd" (RAT) AS RAT_MATH; 
-	END;
-or in single unit per use form:
-	USE D;
-	USE C: "xx:aa"; 
-	USE A: "xx:aa" AS B; 
-	USE "FOO.ORG/IMG"; 
-	USE "FOO.ORG/FGP" AS F;
-	USE "FOO.ORG/FGP" : "xx:aa" AS F;
-	USE "FOO.ORG/SORTER" : "xx:aa" (ISORT) AS ISORTER;
-another idea.  consider a fortran-like keyword=value syntax.
-	USE (unit=MATH); --system use
-	USE (unit=MATH, localname=M); --system use with rename.
-	USE (MATH, M); --shorter syntax for the previous use.
-	USE (unit="foo.org/img"); --local use
-	USE (unit="foo.org/img", alias=image); --local use with rename.
-	USE (unit=math, alias=m, args=isort); --local use of abstract unit.
-	USE ("math", "m", "isort");
-USE "unit=math", "alias=m";
-USE "math", "m", "version=xx:aa"; 
-USE "sorter", "args=iorder", "as=isorter";
-USE "sorter", "version=xx:aa", "args=iorder", "as=isorter";
-use "xmath", "args=iorder,corder", "as=imath"; 
+examples of using with(..) for unit args.
+
+	USE MATH;	--system use
+	USE MATH AS M;	--renaming system use
+	USE MATH VERSION "crc32:xxx"; --versioned system use
+	USE SORTER WITH(IORDER) AS ISORTER;	--abstract use.
+	USE SORTER VERSION "md5:xx" WITH (IORDER) AS ISORTER;
+		--versioned abstract use
+	USE ARGLE WITH (ARGLE, BARGLE) AS FOOGOL;
+		--multiple arg abstract use.
+	USE "FOO.ORG/BAR";  --local use of bar
+	USE "FOO.ORG/BAR" AS FOOBAR;  --renaming local use of bar
+	USE "FOO.ORG/BAR" VERSION "sha1:yy" AS FOOBAR;  
+		--versioned renaming local use of bar
+	
+
 	
 abstract units
 --------------
@@ -353,7 +329,7 @@ parameters are other concrete units, each of which has a type
 or 'signature'.  An abstract unit is instantiated 
 into a *concrete unit* via a USE..AS statement, e.g. 
 
-	USE ABS_UNIT(SIG) AS CONC_UNIT;
+	USE ABS_UNIT WITH(SIG) AS CONC_UNIT;
 
 (Normal units are concrete units.)
 
@@ -379,7 +355,7 @@ UNIT IORDER;
 	(* concrete unit for integer comparison *)
 	TYPE ALPHA = INTEGER;
 	
-	FUNCTION LT(A, B: ALPHA -> RV: BOOLEAN);
+	FUNCTION GT(A, B: ALPHA -> RV: BOOLEAN);
 		BEGIN
 			IF A < B THEN
 				RV := TRUE
@@ -397,32 +373,30 @@ END;
 
 --begin file sorter/main.yev
 
-ABSTRACT USE O: ORDER;
+	ABSTRACT UNIT SORTER;
 
-TYPE
-	ORDER = SIGNATURE
-			ALPHA: TYPEVAR;
-			LT   : FUNCTION(A, B: ALPHA -> RV: BOOLEAN);
-			COPY : PROCEDURE(VAR A: ALPHA; B: ALPHA)
-		END;
+	TYPE ORDER = SIGNATURE
+			TYPE ALPHA;
+			FUNCTION GT(A, B: ALPHA -> RV: BOOLEAN);
+			PROCEDURE COPY(VAR A: ALPHA; B: ALPHA)
+		     END;
 
-	
-PROCEDURE SORT(VAR A: ARRAY OF O.ALPHA);
-	VAR
-		I, J : INTEGER;
-		TMP  : O.ALPHA;
-BEGIN
-	FOR I := 0 TO LEN(A)-2 DO 
-		FOR J := I+1 TO LEN(A)-1 DO 
-			IF O.LT(A[I], A[J]) THEN
-				BEGIN
-				O.COPY(TMP, A[I]);
-				O.COPY(A[I], A[J]);
-				O.COPY(A[J], TMP)
-				END
-			ELIF NOT O.LT(A[I], A[J]) THEN
-				SKIP
-END (* SORT *)
+	PROCEDURE SORT(VAR A: ARRAY OF ORDER.ALPHA);
+		VAR
+			I, J : INTEGER;
+			TMP  : O.ALPHA;
+	BEGIN
+		FOR I := 0 TO LEN(A)-2 DO 
+			FOR J := I+1 TO LEN(A)-1 DO 
+				IF ORDER.GT(A[I], A[J]) THEN
+					BEGIN
+					ORDER.COPY(TMP, A[I]);
+					ORDER.COPY(A[I], A[J]);
+					ORDER.COPY(A[J], TMP)
+					END
+				ELIF NOT ORDER.GT(A[I], A[J]) THEN
+					SKIP
+	END (* SORT *)
 
 --end file sorter/main.yev
 
