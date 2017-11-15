@@ -566,8 +566,10 @@ Normal development of a unit requires running multiple tools.
     - uninitialized variable reads (read before write to a var)
     - dead writes (two writes to a var with no intervening read)
     - terminal writes (write to a var with no subsequent read)
-  + coverage problems : the set of interpreter runs should include
-    data showing each line being run at least once. 
+  + coverage problems : the set of interpreter runs must include
+    data showing each line being run at least once. nb, not every
+    line need be executed in a single run, but across the set of runs
+    each line must be run at least once. 
   if problems are found, they will be reported, and if no 
   problems are found, a "blessing" is issued (sprinkler is 
   short for "holy water sprinkler")
@@ -710,7 +712,7 @@ continue = CONTINUE.
 how signatures might work.
 	(* in abstract sorter unit file *)
 	TYPE order = SIGNATURE
-			TYPEVAR alpha;
+			TYPE alpha;
 			FUNCTION gt(a,b: alpha -> r:boolean);
 			PROCEDURE copy(a: alpha; var b: alpha);
 			END;
