@@ -272,87 +272,90 @@ examples of the USE statement.
 
 using a concrete system unit.
 
-	USE MATH;
+	USE MATH;		(* now we can reference math.sqrt() *)
 
 using an abstract system unit.
 
-	USE RAT;	(* a concrete unit *)
-	USE CMPLX_MATH(RAT) AS CMPLX_RAT;
+	USE RAT;				(* concrete unit *)
+	USE CMPLX_MATH(RAT) AS CMPLX_RAT;	(* abstract unit *)
 
 using a local unit (a non-system unit provided either by a third-party
-or by the programmer herself).
+or by the programmer).
 
-	USE "FOO.ORG/IMATH"
-	(* makes IMATH module available. *)
+	USE "FOO.ORG/IMATH"; 	(* now IMATH unit is available *)
 
 using a local abstract unit.
 
-	USE "FOO.ORG/RAT";	(* we now have concrete RAT module *)
-	USE "FOO.ORG/IMATH" (RAT) AS RAT_MATH; 
+	USE "FOO.ORG/CMPLX";	(* now CMPLX unit is available *)
+	USE "FOO.ORG/CMATH" (CMPLX) AS CMPLX_MATH; 
 
 All of these USEs are non-versioned.  This means they do not
-have reproducible requirements for the signatures of the USEd units.
+have specific requirements for the signatures of the USEd units.
 For development or experimental cases, this is ok.  
 
 As an idea to be tested (does versioning units help?) - we can specify
 a version to the sprinkler.   The unit 'version' or meta-signature for a
 unit, is just the hash of the signature of a unit (where this signature
 is written out as a string of text, in a normalized form).  The hash
-can be a non-cryptologic hash or a cryptologic hash like MD5, etc.
+can be a non-cryptologic hash like Adler32 or CRC32, 
+or a cryptologic hash like MD5, etc.
 
-	USE MATH            VERSION "adler32:062c0215"; 
-	USE "FOO.ORG/RAT"   VERSION "adler32:deadbeef";	
-	USE "FOO.ORG/IMATH" VERSION "crc32:0123abcd" WITH (RAT) AS RAT_MATH; 
-
-examples of using with(..) for unit args.
+	USE MATH            : "adler32:062c0215"; 
+	USE "FOO.ORG/RAT"   : "adler32:deadbeef";	
+	USE "FOO.ORG/IMATH" : "crc32:0123abcd" (RAT) AS RAT_MATH; 
 
 	USE MATH;	--system use
 	USE MATH AS M;	--renaming system use
-	USE MATH VERSION "crc32:xxx"; --versioned system use
-	USE SORTER WITH(IORDER) AS ISORTER;	--abstract use.
-	USE SORTER VERSION "md5:xx" WITH (IORDER) AS ISORTER;
+	USE MATH : "crc32:2345adea"; --versioned system use
+	USE SORTER(IORDER) AS ISORTER;	--abstract use.
+	USE SORTER : "vt:1.9.1" (IORDER) AS ISORTER;
 		--versioned abstract use
-	USE ARGLE WITH (ARGLE, BARGLE) AS FOOGOL;
+	USE FOO(RED, GREEN) AS RGFOO;
 		--multiple arg abstract use.
 	USE "FOO.ORG/BAR";  --local use of bar
 	USE "FOO.ORG/BAR" AS FOOBAR;  --renaming local use of bar
-	USE "FOO.ORG/BAR" VERSION "sha1:yy" AS FOOBAR;  
+	USE "FOO.ORG/BAR" : "md5:e25d4e70ff2977161e0c46d34beeaf400"
+		AS FOOBAR;
 		--versioned renaming local use of bar
-	
 
-	
+version identifiers have a tag followed by the textual
+representation of a hash value (lowercased for hex digits a-f).
+the tag values include: vt = version triple, a plain hash
+function (e.g. one of adler32, crc32, fnv1/64, fnv1a/64),
+or a cryptologic hash function (e.g. one of md5, sha1).
+
 abstract units
 --------------
 
-An *abstract unit* is a unit that accepts parameters.  These 
-parameters are other concrete units, each of which has a type
-or 'signature'.  An abstract unit is instantiated 
-into a *concrete unit* via a USE..AS statement, e.g. 
+An *abstract unit* is a unit that requires one or more concrete
+unit parameters to be itself instantiated as a new concrete
+unit.  These parameters are other concrete units, each of which
+has a type or 'signature'.  An abstract unit is instantiated
+into a *concrete unit* via a USE..AS statement, e.g.
 
-	USE ABS_UNIT WITH(SIG) AS CONC_UNIT;
+	USE ABS_UNIT(SIG) AS CONC_UNIT;
 
 (Normal units are concrete units.)
 
-A *signature* is a kind of type - 
-the type of a unit.  A signature type
-contains type signatures
-of named types, constants, record types and procedures.
+A *signature* is a kind of type - the type of a unit.
+A signature type contains type signatures of named types,
+constants, record types and procedures.
 
-A units is either concrete or abstract. The former
-is the more common of the two - in some sense the normal
-meaning of 'unit', absent qualification.
+A unit is either concrete or abstract. The term 'unit' absent 
+futher qualification is a concrete unit.
 
-Another take on abstract units.  Consider how an ML functor 
-works, acting as a function that takes a structure and 
-returns a structure.  Here, we would have a way to 
-take an abstract unit and a signature argument, 
-and produce a concrete unit.
+When one references an abstract unit in a USE statement, 
+one provides the abstract unit with one or more concrete 
+unit parameters, and creates a new concrete unit.
+The concrete unit parameters must have signatures that conform 
+with the signatures referenced in the body of the abstract unit.
 
 --begin file iorder/main.yev
 
-UNIT IORDER;
+	unit iorder;
 
-	(* concrete unit for integer comparison *)
+	(* concrete unit IORDER for integer comparison *)
+
 	TYPE ALPHA = INTEGER;
 	
 	FUNCTION GT(A, B: ALPHA -> RV: BOOLEAN);
@@ -367,13 +370,14 @@ UNIT IORDER;
 		BEGIN
 			A := B
 		END
-END;
 
 --end file iorder/main.yev
 
 --begin file sorter/main.yev
 
-	ABSTRACT UNIT SORTER;
+	(* abstract unit SORTER *)
+
+	unit sorter(order: signature);
 
 	TYPE ORDER = SIGNATURE
 			TYPE ALPHA;
@@ -381,10 +385,13 @@ END;
 			PROCEDURE COPY(VAR A: ALPHA; B: ALPHA)
 		     END;
 
+	(* the presence of a declaration that references a signature
+           marks the current unit as abstract. *)
+
 	PROCEDURE SORT(VAR A: ARRAY OF ORDER.ALPHA);
 		VAR
 			I, J : INTEGER;
-			TMP  : O.ALPHA;
+			TMP  : ORDER.ALPHA;
 	BEGIN
 		FOR I := 0 TO LEN(A)-2 DO 
 			FOR J := I+1 TO LEN(A)-1 DO 
@@ -408,9 +415,9 @@ program green;
 	var 
 		a: array 10 of integer
 begin
-	a := array(3,1,4,1,5,9,2,6,5);
+	a := (3,1,4,1,5,9,2,6,5);
 	isorter.sort(a);
-	write(a)
+	writeln(a)
 end
 
 const-ness and pointers
@@ -520,32 +527,29 @@ programmer will find unconventional.
 3. At least one branch must evaluate to true.  If no branches evaluate
    to true, the program halts with an error.
 4. If more than one branch is true, a true branch is selected using 
-   some method and executed.  The choice of true branch to execute is 
-   implementation-dependent.  A program that relies on a particular order
-   of if-test execution is erroneous; an implementation is encouraged 
-   but not required to diagnose this condition.
-5. If the lexical order of if-branches changes the output of the program,
-   the program should be considered defective, even though the compiler 
-   itself is not required to detect or report this.
+   an implementation-dependent method and executed.  
+5. If the order in which if-branches are tested changes the output 
+   of the program, the program should be considered erroneous, even 
+   though the compiler itself is not required to detect or report this.
 
 For the first implementation of the language, compile-time
 test order randomization will be done.
 
-The case statement, similarly, lacks an else part, and requires that 
-one of the cases evaluate to true.  The case-statement
-differs from the if-statement in that *exactly* one 
-branch must be true.
+The case statement, similarly, lacks an else part, and requires
+that one of the cases evaluate to true.  The case-statement
+differs from the if-statement in that *exactly* one branch
+must be true.
 
 Consider the if-statement
 
-	if C1 then S1
+	if   C1 then S1
 	elif C2 then S2
 	elif C3 then S3 end
 
-Using compile-time (3a) 'test order randomization', this code might be 
+Using compile-time 'test order randomization', this code might be 
 evaluated as if it were written in a different order:
 
-	if C2 then S2
+	if   C2 then S2
 	elif C1 then S1
 	elif C3 then S3 end
 
@@ -566,6 +570,7 @@ Normal development of a unit requires running multiple tools.
     - uninitialized variable reads (read before write to a var)
     - dead writes (two writes to a var with no intervening read)
     - terminal writes (write to a var with no subsequent read)
+    - dead variable (a variable is never written to)
   + coverage problems : the set of interpreter runs must include
     data showing each line being run at least once. nb, not every
     line need be executed in a single run, but across the set of runs
@@ -573,8 +578,8 @@ Normal development of a unit requires running multiple tools.
   if problems are found, they will be reported, and if no 
   problems are found, a "blessing" is issued (sprinkler is 
   short for "holy water sprinkler")
-* the compiler (one run) takes one or more blessed units 
-  compiles it/them into either a library or an executable
+* the compiler (one run) takes a set of blessed units 
+  and compiles it into either a library or an executable
   program.
 
 The interpreter will have a mode in which the reads and writes
@@ -632,63 +637,56 @@ programming harder.  It will be interesting to see if
 these features are a net plus or minus (and plus or minus
 with respect to what ends).
 
-thoughts on nondeterministic if
--------------------------------
+consider - idea 8 
 
-say you start out with code like: ::
+	source input:
+		if c1 then s1
+		elif c2 then s2
+		elif c3 then s3
 
-	if C1 then S1
-	elif C2 then S2
-	elif C3 then S3 end.
-
-at runtime generate three random numbers (corresponding with 
-branch conditions C1, C2, C3.  Call these three random numbers
-R1, R2, R3.   consider implementing the nondeterministic if with 
-logic like :: 
-
-	xprev = 1	--seed
-	..
-	rand(xprev)
-		a = 209
-		m = 4093
-		xnext = a * xprev mod m 
-		return xnext
-
-	idea 3
-		(best idea so far for runtime test order randomization.)
-		rmax = -1
-		r1 = -1 
-		r2 = -1
-		r3 = -1 
-		if C1 then r1 = rand() ; rmax = max(r1, rmax) end
-		if C2 then r2 = rand() ; rmax = max(r2, rmax) end
-		if C3 then r3 = rand() ; rmax = max(r3, rmax) end
-		if   r1 == rmax then S1
-		elif r2 == rmax then S2
-		elif r3 == rmax then S3
+	if one were using run-time test randomization, 
+	this will be translated to something like:
+		b1 = c1; b2 = c2; b3 = c3
+		true_branches = []
+		if b1 then true_branches.append(1)	
+		if b2 then true_branches.append(2)	
+		if b3 then true_branches.append(3)
+		if len true_branches = 0 
+			error, nonexhaustive tests
+		elif len true branches = 1
+			b = true branch 0
+			if b = 1 then s1
+			elif b = 2 then s2
+			elif b = 3 then s3.
 		else
-			fail, no true branch
-		end
+			--more than one true branch.
+			ntrue = len true branches
+			r = rand number mod ntrue 
+			b = true_branches[r]
+			if b = 1 then s1
+			elif b = 2 then s2
+			elif b = 3 then s3.
+	if one were using compile-time test order randomization, 
+	this would be translated to (say):
+		if c2 then s2
+		elif c1 then s1
+		elif c3 then s3
+		else error (non-exhaustive test)
 
-	000000000000000000000000000000
 
-	idea 6, another try at round robin.
-
-		(at start of scope) offset = 0 
-		...
-		b[0] = C0 ; b[1] = C1 ; b[2] = C2 
-		for i 0 to 2 do
-			k = (i+offset) % 3
-			if   k==0 and b0 then S0
-			elif k==1 and b1 then S1
-			elif k==2 and b2 then S2
-			else
-				fail, no true branch
-			end
-		end
-		offset = offset + 1
-
-	000000000000000000000000000000
+grading logic example.
+	if g > 90 then a
+	elif g > 80 then b 
+	elif g > 70 then c 
+	elif g >= 60 then d 
+	else f 
+this would need to be written as
+	if 0 <= g < 60 then f
+	elif 60 <= g < 70 then d
+	elif 70 <= g < 80 then c
+	elif 80 <= g < 90 then b
+	elif 90 <= g <= 100 then a
+so that the branches would be order-independent and exhaustive.
 
 ------------
 
