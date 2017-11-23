@@ -1,0 +1,108 @@
+
+thoughts about using A68-like conformity clauses
+================================================
+
+idea for using a case statement:
+
+[1]	CASE P^ OF 
+		NIL : ... handle NIL case.
+	|	NOT NIL: ... handle non-NIL case ...
+			P^.S := "test"; 
+			P^.I := 1
+	END;
+
+the logical problem is that NOT takes a boolean arg, 
+not a pointer, and returns a boolean result, not a pointer.
+
+[2]	IF   P = NIL  THEN ...handle NIL case...
+	ELIF P <> NIL THEN ...handle normal case...
+	END
+
+a simple-if test works, but there is no obvious way to tell 
+whether or not a test should be treated as a sum type check.
+
+[3] suppose you had a NULL intrinsic like:
+
+	FUNCTION NULL(P: ^ANY): BOOLEAN;
+	BEGIN
+		RETURN P = NIL
+	END;
+
+then we could use a standard case statement like:
+
+	CASE NULL(P) OF 
+		TRUE: ...handle NIL case...
+	|	FALSE: ...handle non-NIL case...
+	END;
+
+for null checking.
+
+The usability problem with alternatives [2] and [3] is that 
+it's not evident at a glance if an IF-statement or CASE-statement
+is being used as a non-NIL check, or as a regular statement.
+
+FUNCTION LIST_LEN(P: ^NODE):INTEGER;
+	VAR CURR: ^NODE;
+	    I: INTEGER
+1	BEGIN
+5		CURR := P;
+9		I := 0;
+14		WHILE CURR <> NIL DO
+20			I := I + 1;
+26			CURR := CURR^.NEXT
+26		END;
+30		RETURN I
+31	END			(31 tokens)
+
+Assume we had the null() builtin function as described above in 
+option 3.  The body of LIST_LEN would now look like this.
+
+1	BEGIN
+5		CURR := P;
+9		I := 0;
+12		WHILE TRUE DO
+18			CASE NULL(CURR) OF
+21				TRUE: BREAK
+24			|	FALSE:
+30					I := I + 1;
+36					CURR := CURR^.NEXT
+37			END
+38		END
+39	END			(39 tokens)
+
+consider a dedicated MATCH statement:
+
+1	BEGIN
+5		CURR := P;
+9		I := 0;
+12		WHILE TRUE DO
+14			MATCH P
+17				NIL: BREAK
+21			|	NOT NIL:
+27					I := I + 1;
+33					CURR := CURR^.NEXT
+34			END
+35		END
+36	END			(36 tokens)
+						
+current (2017 1122) notional syntax of Yevgenia:
+
+FUNCTION LIST_LEN(P: ^NODE -> L: INTEGER)
+	VAR CURR: ^NODE;
+	    I: INTEGER;
+1	BEGIN
+5		CURR := P;
+9		I := 0;
+14		WHILE CURR <> NIL DO
+15			BEGIN
+21			I := I + 1;
+27			CURR := CURR^.NEXT
+29			END;
+32		L := I
+33	END			(33 tokens)
+
+uninit use before read attack on linux kernel . 
+
+http://www.cc.gatech.edu/~klu38/publications/ubi-ndss17.pdf
+
+[end of file]
