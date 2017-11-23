@@ -1,0 +1,40 @@
+thoughts about maps
+-------------------
+
+Golang uses the name 'maps' to refer to associative arrays.
+It would be convenient to provide a standard associative
+array in the language.  In Yevgenia, these are called 'tables'.
+
+A table is a dynamically resizeable associative array.
+It is provided by an abstract unit 'table' with some default
+procedures. 
+
+
+	SIGNATURE tablevar; 
+		table_type: typevar;
+		procedure init(var t: table_type);
+		function first_key(t: table_type -> k: key_type); 
+		function next_key(k, t: table_type -> rk: key_type); 
+		function is_last_key(k, t: table_type -> b: boolean); 
+		function get(t: table_type, k: key_type 
+			-> v: value_type, b: boolean);
+		procedure set(t: table_type, k: key_type, v: value_type); 
+		...there should be an APPEND and a DELETE procedure.
+	END; 
+
+one would iterate over a table with code like: ::
+
+	var t: si_table;
+	begin ...
+		si_table.init(t, k0);
+		k := k0
+		while not si_table.last(k) do 
+			val, present := si_table.get(k)
+			if present then
+				do stuff with val.
+				k := si_table.next(k)
+			elif not present then 
+				error	
+			end;
+		end;
+	end;
