@@ -9,7 +9,6 @@ A table is a dynamically resizeable associative array.
 It is provided by an abstract unit 'table' with some default
 procedures. 
 
-
 	SIGNATURE tablevar; 
 		table_type: typevar;
 		procedure init(var t: table_type);

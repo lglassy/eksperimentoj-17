@@ -101,8 +101,50 @@ FUNCTION LIST_LEN(P: ^NODE -> L: INTEGER)
 32		L := I
 33	END			(33 tokens)
 
+Yevgenia, IF-syntax instead of CASE
+
+1	BEGIN
+5		CURR := P;
+9		I := 0;
+12		WHILE TRUE DO
+16			IF CURR = NIL THEN 
+23				BEGIN L := 0 ; BREAK END
+28			ELIF CURR <> NIL THEN 
+29				BEGIN
+35				I := I + 1;
+41				CURR := CURR^.NEXT
+42				END
+43	END				(43 tokens)
+
 uninit use before read attack on linux kernel . 
 
 http://www.cc.gatech.edu/~klu38/publications/ubi-ndss17.pdf
+
+function insertionSort(array A)
+    for i from 1 to length[A]-1 do
+        value := A[i] 
+        j := i-1
+        while j >= 0 and A[j] > value do
+            A[j+1] := A[j]
+            j := j-1
+        done
+        A[j+1] = value
+    done
+
+function insertion_sort(var a: array of integer)
+	var i, j, value: integer;
+begin
+	for i := 1 to len(A)-1 do 
+		begin
+		value := a[i];
+		j := i - 1;
+		while j >= 0 and a[j] > value do 
+			begin
+			a[j+1] := a[j];
+			j := j - 1
+			end;
+		a[j+1] := value
+		end
+end
 
 [end of file]

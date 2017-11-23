@@ -690,33 +690,11 @@ so that the branches would be order-independent and exhaustive.
 
 ------------
 
-notes from chromebook. syntax has elements from pascal and oberon.
+there should be a simple way to get Yevgenia programs to use 
+external libraries written in C.
 
-TLEs (top level entities) = program | unit | ?
-
-program = PROGRAM name ; uses const? type? var? procs? block.
-
-unit = UNIT name args? ; uses const? type? procs? .
-
-stmt = assign | if | while | for | pass | break | continue 
-assign = lhs := expr.
-if = IF expr THEN stmt (ELIF expr THEN stmt)+.
-while = WHILE expr DO stmt.
-for = FOR lhs := expr TO expr (BY expr) DO stmt.
-pass = PASS.
-break = BREAK.
-continue = CONTINUE.
-
-how signatures might work.
-	(* in abstract sorter unit file *)
-	TYPE order = SIGNATURE
-			TYPE alpha;
-			FUNCTION gt(a,b: alpha -> r:boolean);
-			PROCEDURE copy(a: alpha; var b: alpha);
-			END;
-
-UNIT sorter(o: order);
-	procedure sort(var a: array of o.alpha) ...
-
+	code := """C
+	int incval(int i) { return i+1; }
+""";
  
 [end of file]
