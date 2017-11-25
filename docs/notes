@@ -708,5 +708,25 @@ external libraries written in C.
 	int incval(int i) { return i+1; }
 """;
 
+implementation notes
+--------------------
+
+The first version implemented in python3, using a 
+modified form of the code in Ruslan Spivak's tutorial.
+Consider interleaving code-bearing comments into the python code; 
+these comments could have the form
+
+# BEGIN C
+# ...
+# END C
+
+and 
+
+# BEGIN YEVGENIA
+# ...
+# END YEVGENIA
+
+and would contain translations of the preceding python code segment into 
+C or Yevgenia, to aid later development.
  
 [end of file]
