@@ -15,8 +15,8 @@ Some of the ideas I'd like to experiment with include:
 2. dead writes (writes with no intervening reads)
 3. terminal writes (writes to loc var with no subsequent read)
 4. no global variables
-5. partial IF/CASEs (non-exhaustive conditions)
-6. overlapping IF/CASEs.
+5. partial test coverage in IF/CASEs (non-exhaustive conditions)
+6. overlapping tests in IF/CASEs.
 6. problems with dynamic memory allocation
    (read before alloc, read after alloc but 
    before init, read after free, double free)
@@ -97,7 +97,7 @@ miscellaneous types ::
 compound types (containing multiple values) - arrays, records, tables :: 
 
 	ARRAY N OF T. 
-	STRING is just ARRAY OF BYTE.
+	STRING is just ARRAY OF BYTE. (initially ASCII)
 	RECORD field (";" field)* END.
 
 	arrays and records can be assigned to or compared with 
@@ -174,23 +174,34 @@ in the language.  In Yevgenia, these are called 'tables'.
 A table is a dynamically resizeable associative array.  It is 
 provided by an abstract unit 'table' with some default procedures. ::
 
-	SIGNATURE tablevar; 
-		table_type: typevar;
-		procedure init(var t: table_type);
-		function first_key(t: table_type -> k: key_type); 
-		function next_key(k, t: table_type -> rk: key_type); 
-		function is_last_key(k, t: table_type -> b: boolean); 
-		function get(t: table_type, k: key_type 
-			-> v: value_type, b: boolean);
-		procedure set(t: table_type, k: key_type, v: value_type); 
-		...there should be an APPEND and a DELETE procedure.
-	END; 
+	CU = "concrete unit"
+	CU.ref(table, key) -> valued, present:bool)
+	CU.haskey(table, key) -> bool
+	CU.firstkey(table) -> iterkey 
+	CU.nextkey(table, iterkey)
+	CU.atend(table, iterkey)
+ 
+# 	SIGNATURE tablevar; 
+# 		table_type: typevar;
+# 		procedure init(var t: table_type);
+# 		function first_key(t: table_type -> k: key_type); 
+# 		function next_key(k, t: table_type -> rk: key_type); 
+# 		function is_last_key(k, t: table_type -> b: boolean); 
+# 		function get(t: table_type, k: key_type 
+# 			-> v: value_type, b: boolean);
+# 		procedure set(t: table_type, k: key_type, v: value_type); 
+# 		...there should be an APPEND and a DELETE procedure.
+# 	END; 
 
-one would iterate over a table with code like: ::
+say we have a table the maps strings to ints.
 
-	var t: si_table;
+	use table(...) as si_table;
+
+one would iterate over a table T with code like: ::
+
+	var T: si_table.table;
 	begin ...
-		si_table.init(t, k0);
+		k := si_table.first(Tsi_table.init(t, k0);
 		k := k0
 		while not si_table.last(k) do 
 			val, present := si_table.get(k)
@@ -692,9 +703,10 @@ so that the branches would be order-independent and exhaustive.
 
 there should be a simple way to get Yevgenia programs to use 
 external libraries written in C.
-
+	
 	code := """C
 	int incval(int i) { return i+1; }
 """;
+
  
 [end of file]
