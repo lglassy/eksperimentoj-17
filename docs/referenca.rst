@@ -1,44 +1,58 @@
 ﻿Alder Manual
-30 April 2018
+============
 
+.. 2018 0507
 
-This document describes the Alder programming language. x
+This document describes the Alder programming language.
 
+Alder is an imperative programming language.  Its syntax and semantics
+show influences from ALGOL-60, Pascal, and other languages.  I hope to
+use Alder as a test-bed for various ideas I've had over the years.
 
-Alder is an imperative programming language.  Its syntax and semantics show influences from ALGOL-60, Pascal, and other languages.  I intend to use Alder as a test-bed for various ideas I've had over the years:
-1. Like Gypsy, disallow global mutable state.
-2. For a variable, the scope is exactly one of:
-   1. A local variable in the current procedure.
-   2. A parameter in the current procedure.
-1. For a constant (I.e. a named constant, a named type, or a procedure), the scope is exactly one of:
-   1. Local to the current procedure
-   2. Local to the current module
-   3. Imported from a foreign module.  Note that imports are not transitive.
-1. Like Pascal, provide some relatively machine-independent basic types, and a way to construct composite types (records).  Unlike Pascal, Alder does not provide pointers.
-2. Like CSP, provide a way to do concurrent programming without shared state.
-3. Like Go and modern Fortran, provide ways to resize arrays at runtime.
-   1. example declaration: integer A[1:9]
-   2. example array extension: append A, 1;  (array A now has 10 elements.) 
-   3. example array downward resize: A := A[1:4] (now A has 4 elements.)  you can't resize an array to make it bigger; only append can do that.
-   4. Like a Go slice, an array has a size and a capacity.  The size goes down when you do a resize, but the capacity is unchanged.  capacity grows via append, as in Go.
-1.  provide ways to recognize various nonsensical situations:
-   1. dead read - Read before write, i.e. uninitialized read of a variable.
-   2. dead write - Write after write (double write, first write is useless.  This is similar to Go's "must read" detector.)
-   3. terminal write - write to loc var not followed by a read, useless.
-   4. exit no write – exit function without writing to output parameter
-   5. write to constant - write to an in-only parameter.
-   6. read from output – read from an out-only parameter.
-   7. dynamic memory allocation problems (read before alloc, read after alloc but before init, read after free, double free)
-   8. out-of-bounds array references.
-1. how parameters work:  
-   1. For regular procedures, parameters are passed in-out.  One way this could be implemented is by using pass-by-reference.
-   2. For function procedures, input parameters are passed in-only, and output parameters are passed out-only.  In both cases, the parameters can use pass-by-reference, because input parameters cannot appear on the LHS of an assignment, and output parameters cannot appear on the RHS of an assignment or in an expression context. 
-   3. Function procedures return their results via explicit output parameters.  A function procedure may return multiple results.
-   4. For both regular and function procedures, parameters may not be aliased.  An implementation is required to detect such aliasing and flag it as an error. This detection may be at compile time or at runtime. 
-1. Procedure declarations may not be nested.  The one exception is that a procedure that takes a procedure parameter, includes a "stub declaration" for the procedure parameter.  This stub declaration provides just the types of the procedure parameter's own input and output parameters, and otherwise contains no executable statements.
-2. Top level compilation units include a nameless block (the program's initial procedure) and zero or more modules.  
-3. A module is a special kind of block with no statements and with no variable declarations.  A module only includes constant, type, and procedure declarations.  All the entities declared in the module are exported.  A client module or block may access these entities by prefixing an exported entity with its module name.
-4. Similar to how this works in Go, string is just sugar for byte array, with the constraint that the contents will be interpretable as ASCII (sans char 127).  Like all arrays, a string knows its own length, available via the size() intrinsic.
+High level goals
+----------------
+
+* in general, make scoping work so that a procedure can be understood
+  in isolation (best case) or with minimum reference to other entities
+  (worst case)
+* provide a simple module mechanism for separate compilation
+* detect various nonsensical runtime conditions
+
+Ideas::
+
+ 1. Like Gypsy, disallow global mutable state.
+ 2. For a variable, the scope is exactly one of:
+    1. A local variable in the current procedure.
+    2. A parameter in the current procedure.
+ 1. For a constant (I.e. a named constant, a named type, or a procedure), the scope is exactly one of:
+    1. Local to the current procedure
+    2. Local to the current module
+    3. Imported from a foreign module.  Note that imports are not transitive.
+ 1. Like Pascal, provide some relatively machine-independent basic types, and a way to construct composite types (records).  Unlike Pascal, Alder does not provide pointers.
+ 2. Like CSP, provide a way to do concurrent programming without shared state.
+ 3. Like Go and modern Fortran, provide ways to resize arrays at runtime.
+    1. example declaration: integer A[1:9]
+    2. example array extension: append A, 1;  (array A now has 10 elements.) 
+    3. example array downward resize: A := A[1:4] (now A has 4 elements.)  you can't resize an array to make it bigger; only append can do that.
+    4. Like a Go slice, an array has a size and a capacity.  The size goes down when you do a resize, but the capacity is unchanged.  capacity grows via append, as in Go.
+ 1.  provide ways to recognize various nonsensical situations:
+    1. dead read - Read before write, i.e. uninitialized read of a variable.
+    2. dead write - Write after write (double write, first write is useless.  This is similar to Go's "must read" detector.)
+    3. terminal write - write to loc var not followed by a read, useless.
+    4. exit no write – exit function without writing to output parameter
+    5. write to constant - write to an in-only parameter.
+    6. read from output – read from an out-only parameter.
+    7. dynamic memory allocation problems (read before alloc, read after alloc but before init, read after free, double free)
+    8. out-of-bounds array references.
+ 1. how parameters work:  
+    1. For regular procedures, parameters are passed in-out.  One way this could be implemented is by using pass-by-reference.
+    2. For function procedures, input parameters are passed in-only, and output parameters are passed out-only.  In both cases, the parameters can use pass-by-reference, because input parameters cannot appear on the LHS of an assignment, and output parameters cannot appear on the RHS of an assignment or in an expression context. 
+    3. Function procedures return their results via explicit output parameters.  A function procedure may return multiple results.
+    4. For both regular and function procedures, parameters may not be aliased.  An implementation is required to detect such aliasing and flag it as an error. This detection may be at compile time or at runtime. 
+ 1. Procedure declarations may not be nested.  The one exception is that a procedure that takes a procedure parameter, includes a "stub declaration" for the procedure parameter.  This stub declaration provides just the types of the procedure parameter's own input and output parameters, and otherwise contains no executable statements.
+ 2. Top level compilation units include a nameless block (the program's initial procedure) and zero or more modules.  
+ 3. A module is a special kind of block with no statements and with no variable declarations.  A module only includes constant, type, and procedure declarations.  All the entities declared in the module are exported.  A client module or block may access these entities by prefixing an exported entity with its module name.
+ 4. Similar to how this works in Go, string is just sugar for byte array, with the constraint that the contents will be interpretable as ASCII (sans char 127).  Like all arrays, a string knows its own length, available via the size() intrinsic.
 
 
 High level structures --------------------------------------------------------------
@@ -178,6 +192,7 @@ print_URL( R ) ==> prints http://foo.com
 
 How does one wrap that BETA-like idea in an ALGOL-like syntax?
 (2018 0501 – defer the type extension for now.)
+
 
 
 [end of file]
