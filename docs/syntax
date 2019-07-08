@@ -1,4 +1,6 @@
-syntax for experimental pascal derivative.
+[test mod on <alterna> branch - made 2019 0708]
+
+File containing syntax for experimental pascal derivative.
 
 compilation-unit = unit | program.
 unit = UNIT name ";" uct-part proc-decl-list? END.
